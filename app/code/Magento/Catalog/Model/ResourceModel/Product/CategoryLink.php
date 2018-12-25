@@ -122,7 +122,7 @@ class CategoryLink
 
             if ($key === false) {
                 $result['changed'][] = $newCategoryPosition;
-            } elseif ($oldCategoryPositions[$key]['position'] != $newCategoryPosition['position']) {
+            } elseif (isset($oldCategoryPositions[$key]) && $oldCategoryPositions[$key]['position'] != $newCategoryPosition['position']) {
                 $result['updated'][] = $newCategoryPositions[$key];
                 unset($oldCategoryPositions[$key]);
             }
