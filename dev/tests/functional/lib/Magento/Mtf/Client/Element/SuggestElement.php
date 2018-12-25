@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -61,6 +61,13 @@ class SuggestElement extends SimpleElement
     protected $closeButton = '[data-action="close-advanced-select"]';
 
     /**
+     * Searched count.
+     *
+     * @var string
+     */
+    protected $searchedCount = '[class*=search-count]';
+
+    /**
      * Set value.
      *
      * @param string $value
@@ -75,19 +82,15 @@ class SuggestElement extends SimpleElement
         if ($value == '') {
             return;
         }
-        foreach (str_split($value) as $symbol) {
-            $this->keys([$symbol]);
-            $searchedItem = $this->find(sprintf($this->resultItem, $value), Locator::SELECTOR_XPATH);
-            if ($searchedItem->isVisible()) {
-                try {
-                    $searchedItem->click();
-                    break;
-                } catch (\Exception $e) {
-                    // In parallel run on windows change the focus is lost on element
-                    // that causes disappearing of category suggest list.
-                }
+        $this->keys([$value]);
+        $searchedItem = $this->find(sprintf($this->resultItem, $value), Locator::SELECTOR_XPATH);
+        $searchedCountElements = $this->find($this->searchedCount);
+        $this->waitUntil(
+            function () use ($searchedCountElements) {
+                return $searchedCountElements->isVisible() ? true : null;
             }
-        }
+        );
+        $searchedItem->click();
         $closeButton = $this->find($this->closeButton);
         if ($closeButton->isVisible()) {
             $closeButton->click();
@@ -102,7 +105,9 @@ class SuggestElement extends SimpleElement
      */
     public function keys(array $keys)
     {
-        $this->find($this->advancedSelect)->click();
+        if (!$this->find($this->selectInput)->isVisible()) {
+            $this->find($this->advancedSelect)->click();
+        }
         $input = $this->find($this->selectInput);
         $input->click();
         $input->keys($keys);

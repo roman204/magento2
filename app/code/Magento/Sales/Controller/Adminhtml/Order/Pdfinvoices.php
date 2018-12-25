@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Controller\Adminhtml\Order;
@@ -20,8 +20,13 @@ use Magento\Sales\Model\ResourceModel\Order\Collection as OrderCollection;
 /**
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-class Pdfinvoices extends \Magento\Sales\Controller\Adminhtml\Order\AbstractMassAction
+class Pdfinvoices extends \Magento\Sales\Controller\Adminhtml\Order\PdfDocumentsMassAction
 {
+    /**
+     * Authorization level of a basic admin session
+     */
+    const ADMIN_RESOURCE = 'Magento_Sales::invoice';
+
     /**
      * @var FileFactory
      */
@@ -70,6 +75,7 @@ class Pdfinvoices extends \Magento\Sales\Controller\Adminhtml\Order\AbstractMass
      *
      * @param AbstractCollection $collection
      * @return ResponseInterface|ResultInterface
+     * @throws \Exception
      */
     protected function massAction(AbstractCollection $collection)
     {
@@ -78,9 +84,12 @@ class Pdfinvoices extends \Magento\Sales\Controller\Adminhtml\Order\AbstractMass
             $this->messageManager->addError(__('There are no printable documents related to selected orders.'));
             return $this->resultRedirectFactory->create()->setPath($this->getComponentRefererUrl());
         }
+        $pdf = $this->pdfInvoice->getPdf($invoicesCollection->getItems());
+        $fileContent = ['type' => 'string', 'value' => $pdf->render(), 'rm' => true];
+
         return $this->fileFactory->create(
-            sprintf('packingslip%s.pdf', $this->dateTime->date('Y-m-d_H-i-s')),
-            $this->pdfInvoice->getPdf($invoicesCollection->getItems())->render(),
+            sprintf('invoice%s.pdf', $this->dateTime->date('Y-m-d_H-i-s')),
+            $fileContent,
             DirectoryList::VAR_DIR,
             'application/pdf'
         );

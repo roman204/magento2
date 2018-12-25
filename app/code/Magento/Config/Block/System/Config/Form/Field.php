@@ -1,22 +1,20 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 // @codingStandardsIgnoreFile
 
-/**
- * Abstract config form element renderer
- *
- * @author     Magento Core Team <core@magentocommerce.com>
- *
- */
 namespace Magento\Config\Block\System\Config\Form;
 
 /**
+ * Render field html element in Stores Configuration
+ *
+ * @api
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  * @SuppressWarnings(PHPMD.NumberOfChildren)
+ * @since 100.0.2
  */
 class Field extends \Magento\Backend\Block\Template implements \Magento\Framework\Data\Form\Element\Renderer\RendererInterface
 {
@@ -97,6 +95,7 @@ class Field extends \Magento\Backend\Block\Template implements \Magento\Framewor
         $htmlId = $element->getHtmlId();
         $namePrefix = preg_replace('#\[value\](\[\])?$#', '', $element->getName());
         $checkedHtml = $element->getInherit() == 1 ? 'checked="checked"' : '';
+        $disabled = $element->getIsDisableInheritance() == true ? ' disabled="disabled"' : '';
 
         $html = '<td class="use-default">';
         $html .= '<input id="' .
@@ -105,7 +104,7 @@ class Field extends \Magento\Backend\Block\Template implements \Magento\Framewor
             $namePrefix .
             '[inherit]" type="checkbox" value="1"' .
             ' class="checkbox config-inherit" ' .
-            $checkedHtml .
+            $checkedHtml . $disabled .
             ' onclick="toggleValueElements(this, Element.previous(this.parentNode))" /> ';
         $html .= '<label for="' . $htmlId . '_inherit" class="inherit">' . $this->_getInheritCheckboxLabel(
             $element
@@ -123,7 +122,9 @@ class Field extends \Magento\Backend\Block\Template implements \Magento\Framewor
      */
     protected function _isInheritCheckboxRequired(\Magento\Framework\Data\Form\Element\AbstractElement $element)
     {
-        return $element->getCanUseWebsiteValue() || $element->getCanUseDefaultValue();
+        return $element->getCanUseWebsiteValue()
+            || $element->getCanUseDefaultValue()
+            || $element->getCanRestoreToDefault();
     }
 
     /**
@@ -134,7 +135,10 @@ class Field extends \Magento\Backend\Block\Template implements \Magento\Framewor
      */
     protected function _getInheritCheckboxLabel(\Magento\Framework\Data\Form\Element\AbstractElement $element)
     {
-        $checkboxLabel = __('Use Default');
+        $checkboxLabel = __('Use system value');
+        if ($element->getCanUseDefaultValue()) {
+            $checkboxLabel = __('Use Default');
+        }
         if ($element->getCanUseWebsiteValue()) {
             $checkboxLabel = __('Use Website');
         }
@@ -180,7 +184,7 @@ class Field extends \Magento\Backend\Block\Template implements \Magento\Framewor
      * @param string $html
      * @return string
      */
-    protected function _decorateRowHtml($element, $html)
+    protected function _decorateRowHtml(\Magento\Framework\Data\Form\Element\AbstractElement $element, $html)
     {
         return '<tr id="row_' . $element->getHtmlId() . '">' . $html . '</tr>';
     }

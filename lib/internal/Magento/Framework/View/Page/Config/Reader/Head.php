@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Framework\View\Page\Config\Reader;
@@ -71,8 +71,16 @@ class Head implements Layout\ReaderInterface
         Layout\Element $headElement
     ) {
         $pageConfigStructure = $readerContext->getPageConfigStructure();
-        /** @var \Magento\Framework\View\Layout\Element $node */
-        foreach ($headElement as $node) {
+        $nodes = iterator_to_array($headElement, false);
+
+        usort(
+            $nodes,
+            function (Layout\Element $current, Layout\Element $next) {
+                return $current->getAttribute('order') <=> $next->getAttribute('order');
+            }
+        );
+
+        foreach ($nodes as $node) {
             switch ($node->getName()) {
                 case self::HEAD_CSS:
                 case self::HEAD_SCRIPT:
@@ -86,11 +94,11 @@ class Head implements Layout\ReaderInterface
                     break;
 
                 case self::HEAD_TITLE:
-                    $pageConfigStructure->setTitle($node);
+                    $pageConfigStructure->setTitle(new \Magento\Framework\Phrase($node));
                     break;
 
                 case self::HEAD_META:
-                    $pageConfigStructure->setMetaData($node->getAttribute('name'), $node->getAttribute('content'));
+                    $this->setMetadata($pageConfigStructure, $node);
                     break;
 
                 case self::HEAD_ATTRIBUTE:
@@ -105,6 +113,7 @@ class Head implements Layout\ReaderInterface
                     break;
             }
         }
+
         return $this;
     }
 
@@ -121,5 +130,23 @@ class Head implements Layout\ReaderInterface
             $attributes[$attrName] = (string)$attrValue;
         }
         return $attributes;
+    }
+
+    /**
+     * Set metadata
+     *
+     * @param \Magento\Framework\View\Page\Config\Structure $pageConfigStructure
+     * @param \Magento\Framework\View\Layout\Element $node
+     * @return void
+     */
+    private function setMetadata($pageConfigStructure, $node)
+    {
+        if (!$node->getAttribute('name') && $node->getAttribute('property')) {
+            $metadataName = $node->getAttribute('property');
+        } else {
+            $metadataName = $node->getAttribute('name');
+        }
+
+        $pageConfigStructure->setMetadata($metadataName, $node->getAttribute('content'));
     }
 }

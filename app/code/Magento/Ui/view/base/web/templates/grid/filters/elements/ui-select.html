@@ -1,6 +1,6 @@
 <!--
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 -->
@@ -10,7 +10,7 @@
         class="admin__form-field-label"
         data-bind="attr: {for: uid}
 ">
-    <span data-bind="text: label"></span>
+    <span translate="label"></span>
 </label>
 <!-- /ko -->
 <div
@@ -42,6 +42,7 @@
             }
     ">
         <div class="admin__action-multiselect-text"
+             data-role="selected-option"
              data-bind="text: setCaption()">
         </div>
     </div>
@@ -59,7 +60,7 @@
         <div class="admin__action-multiselect-text"
              data-bind="
                 visible: !hasData(),
-                text: selectedPlaceholders.defaultPlaceholder
+                i18n: selectedPlaceholders.defaultPlaceholder
         ">
         </div>
         <!-- ko foreach: { data: getSelected(), as: 'option'}  -->
@@ -73,11 +74,7 @@
                         tabindex="-1"
                         data-bind="click: $parent.removeSelected.bind($parent, value)
                 ">
-                    <span
-                            class="action-close-text"
-                            data-bind="text: 'Close'
-                    ">
-                    </span>
+                    <span class="action-close-text" translate="'Close'"></span>
                 </button>
             </span>
         <!-- /ko -->
@@ -121,7 +118,8 @@
             ">
             <!-- ko foreach: { data: options, as: 'option'}  -->
             <li class="admin__action-multiselect-menu-inner-item _root"
-                data-bind="css: { _parent: $data.optgroup }">
+                data-bind="css: { _parent: $data.optgroup }"
+                data-role="option-group">
                 <div class="action-menu-item"
                      data-bind="
                         css: {
@@ -175,7 +173,7 @@
                     data-action="close-advanced-select"
                     type="button"
                     data-bind="click: outerClick">
-                <span data-bind="text: closeBtnLabel"></span>
+                <span translate="closeBtnLabel"></span>
             </button>
         </div>
         <!-- /ko -->

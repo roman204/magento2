@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Ui\DataProvider\Product\Form\Modifier;
@@ -22,10 +22,15 @@ use Magento\Ui\Component\Form\Element\Checkbox;
 use Magento\Ui\Component\Form\Element\ActionDelete;
 use Magento\Ui\Component\Form\Element\DataType\Text;
 use Magento\Ui\Component\Form\Element\DataType\Number;
+use Magento\Framework\Locale\CurrencyInterface;
 
 /**
  * Data provider for "Customizable Options" panel
+ *
+ * @api
+ *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 101.0.0
  */
 class CustomOptions extends AbstractModifier
 {
@@ -67,6 +72,7 @@ class CustomOptions extends AbstractModifier
     const FIELD_ENABLE = 'affect_product_custom_options';
     const FIELD_OPTION_ID = 'option_id';
     const FIELD_TITLE_NAME = 'title';
+    const FIELD_STORE_TITLE_NAME = 'store_title';
     const FIELD_TYPE_NAME = 'type';
     const FIELD_IS_REQUIRE_NAME = 'is_require';
     const FIELD_SORT_ORDER_NAME = 'sort_order';
@@ -78,6 +84,7 @@ class CustomOptions extends AbstractModifier
     const FIELD_IMAGE_SIZE_X_NAME = 'image_size_x';
     const FIELD_IMAGE_SIZE_Y_NAME = 'image_size_y';
     const FIELD_IS_DELETE = 'is_delete';
+    const FIELD_IS_USE_DEFAULT = 'is_use_default';
     /**#@-*/
 
     /**#@+
@@ -88,39 +95,51 @@ class CustomOptions extends AbstractModifier
     /**#@-*/
 
     /**
-     * @var \Magento\Catalog\Model\Locator\LocatorInterface
+     * @var LocatorInterface
+     * @since 101.0.0
      */
     protected $locator;
 
     /**
      * @var \Magento\Store\Model\StoreManagerInterface
+     * @since 101.0.0
      */
     protected $storeManager;
 
     /**
      * @var \Magento\Catalog\Model\ProductOptions\ConfigInterface
+     * @since 101.0.0
      */
     protected $productOptionsConfig;
 
     /**
      * @var \Magento\Catalog\Model\Config\Source\Product\Options\Price
+     * @since 101.0.0
      */
     protected $productOptionsPrice;
 
     /**
      * @var UrlInterface
+     * @since 101.0.0
      */
     protected $urlBuilder;
 
     /**
      * @var ArrayManager
+     * @since 101.0.0
      */
     protected $arrayManager;
 
     /**
      * @var array
+     * @since 101.0.0
      */
     protected $meta = [];
+
+    /**
+     * @var CurrencyInterface
+     */
+    private $localeCurrency;
 
     /**
      * @param LocatorInterface $locator
@@ -148,41 +167,43 @@ class CustomOptions extends AbstractModifier
 
     /**
      * {@inheritdoc}
+     * @since 101.0.0
      */
     public function modifyData(array $data)
     {
-        if (!in_array($this->locator->getProduct()->getTypeId(), $this->getNotSupportedProductTypes())) {
-            $options = [];
-            $productOptions = $this->locator->getProduct()->getOptions() ?: [];
+        $options = [];
+        $productOptions = $this->locator->getProduct()->getOptions() ?: [];
 
-            /** @var \Magento\Catalog\Model\Product\Option $option */
-            foreach ($productOptions as $index => $option) {
-                $options[$index] = $this->formatFloat(static::FIELD_PRICE_NAME, $option->getData());
-                $values = $option->getValues() ?: [];
+        /** @var \Magento\Catalog\Model\Product\Option $option */
+        foreach ($productOptions as $index => $option) {
+            $optionData = $option->getData();
+            $optionData[static::FIELD_IS_USE_DEFAULT] = !$option->getData(static::FIELD_STORE_TITLE_NAME);
+            $options[$index] = $this->formatPriceByPath(static::FIELD_PRICE_NAME, $optionData);
+            $values = $option->getValues() ?: [];
 
-                /** @var \Magento\Catalog\Model\Product\Option $value */
-                foreach ($values as $value) {
-                    $options[$index][static::GRID_TYPE_SELECT_NAME][] = $this->formatFloat(
-                        static::FIELD_PRICE_NAME,
-                        $value->getData()
-                    );
-                }
+            foreach ($values as $value) {
+                $value->setData(static::FIELD_IS_USE_DEFAULT, !$value->getData(static::FIELD_STORE_TITLE_NAME));
             }
-
-            return array_replace_recursive(
-                $data,
-                [
-                    $this->locator->getProduct()->getId() => [
-                        static::DATA_SOURCE_DEFAULT => [
-                            static::FIELD_ENABLE => 1,
-                            static::GRID_OPTIONS_NAME => $options
-                        ]
-                    ]
-                ]
-            );
+            /** @var \Magento\Catalog\Model\Product\Option $value */
+            foreach ($values as $value) {
+                $options[$index][static::GRID_TYPE_SELECT_NAME][] = $this->formatPriceByPath(
+                    static::FIELD_PRICE_NAME,
+                    $value->getData()
+                );
+            }
         }
 
-        return $data;
+        return array_replace_recursive(
+            $data,
+            [
+                $this->locator->getProduct()->getId() => [
+                    static::DATA_SOURCE_DEFAULT => [
+                        static::FIELD_ENABLE => 1,
+                        static::GRID_OPTIONS_NAME => $options
+                    ]
+                ]
+            ]
+        );
     }
 
     /**
@@ -191,13 +212,14 @@ class CustomOptions extends AbstractModifier
      * @param string $path
      * @param array $data
      * @return array
+     * @since 101.0.0
      */
-    protected function formatFloat($path, array $data)
+    protected function formatPriceByPath($path, array $data)
     {
         $value = $this->arrayManager->get($path, $data);
 
         if (is_numeric($value)) {
-            $data = $this->arrayManager->replace($path, $data, number_format($value, 2, '.', ''));
+            $data = $this->arrayManager->replace($path, $data, $this->formatPrice($value));
         }
 
         return $data;
@@ -205,14 +227,13 @@ class CustomOptions extends AbstractModifier
 
     /**
      * {@inheritdoc}
+     * @since 101.0.0
      */
     public function modifyMeta(array $meta)
     {
         $this->meta = $meta;
 
-        if (!in_array($this->locator->getProduct()->getTypeId(), $this->getNotSupportedProductTypes())) {
-            $this->createCustomOptionsPanel();
-        }
+        $this->createCustomOptionsPanel();
 
         return $this->meta;
     }
@@ -221,6 +242,7 @@ class CustomOptions extends AbstractModifier
      * Create "Customizable Options" panel
      *
      * @return $this
+     * @since 101.0.0
      */
     protected function createCustomOptionsPanel()
     {
@@ -245,8 +267,8 @@ class CustomOptions extends AbstractModifier
                     ],
                     'children' => [
                         static::CONTAINER_HEADER_NAME => $this->getHeaderContainerConfig(10),
-                        static::GRID_OPTIONS_NAME => $this->getOptionsGridConfig(20),
-                        static::FIELD_ENABLE => $this->getEnableFieldConfig(30),
+                        static::FIELD_ENABLE => $this->getEnableFieldConfig(20),
+                        static::GRID_OPTIONS_NAME => $this->getOptionsGridConfig(30)
                     ]
                 ]
             ]
@@ -267,6 +289,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getHeaderContainerConfig($sortOrder)
     {
@@ -279,7 +302,7 @@ class CustomOptions extends AbstractModifier
                         'componentType' => Container::NAME,
                         'template' => 'ui/form/components/complex',
                         'sortOrder' => $sortOrder,
-                        'content' => __('Custom options let shoppers choose the product variations they want.'),
+                        'content' => __('Custom options let customers choose the product variations they want.'),
                     ],
                 ],
             ],
@@ -325,9 +348,9 @@ class CustomOptions extends AbstractModifier
                                 'sortOrder' => 20,
                                 'actions' => [
                                     [
-                                        'targetName' => static::FORM_NAME . '.' . static::FORM_NAME . '.'
-                                            . static::GROUP_CUSTOM_OPTIONS_NAME . '.' . static::GRID_OPTIONS_NAME,
-                                        'actionName' => 'addChild',
+                                        'targetName' => '${ $.ns }.${ $.ns }.' . static::GROUP_CUSTOM_OPTIONS_NAME
+                                            . '.' . static::GRID_OPTIONS_NAME,
+                                        'actionName' => 'processingAddChild',
                                     ]
                                 ]
                             ]
@@ -343,6 +366,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getOptionsGridConfig($sortOrder)
     {
@@ -363,7 +387,7 @@ class CustomOptions extends AbstractModifier
                         'collapsibleHeader' => true,
                         'sortOrder' => $sortOrder,
                         'dataProvider' => static::CUSTOM_OPTIONS_LISTING,
-                        'links' => ['insertData' => '${ $.provider }:${ $.dataProvider }'],
+                        'imports' => ['insertData' => '${ $.provider }:${ $.dataProvider }'],
                     ],
                 ],
             ],
@@ -387,6 +411,7 @@ class CustomOptions extends AbstractModifier
                                 'data' => [
                                     'config' => [
                                         'componentType' => Fieldset::NAME,
+                                        'collapsible' => true,
                                         'label' => null,
                                         'sortOrder' => 10,
                                         'opened' => true,
@@ -394,10 +419,10 @@ class CustomOptions extends AbstractModifier
                                 ],
                             ],
                             'children' => [
+                                static::FIELD_SORT_ORDER_NAME => $this->getPositionFieldConfig(40),
                                 static::CONTAINER_COMMON_NAME => $this->getCommonContainerConfig(10),
                                 static::CONTAINER_TYPE_STATIC_NAME => $this->getStaticTypeContainerConfig(20),
-                                static::GRID_TYPE_SELECT_NAME => $this->getSelectTypeGridConfig(30),
-                                static::FIELD_SORT_ORDER_NAME => $this->getPositionFieldConfig(40)
+                                static::GRID_TYPE_SELECT_NAME => $this->getSelectTypeGridConfig(30)
                             ]
                         ],
                     ]
@@ -411,6 +436,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getEnableFieldConfig($sortOrder)
     {
@@ -434,6 +460,7 @@ class CustomOptions extends AbstractModifier
      * Get config for modal window "Import Options"
      *
      * @return array
+     * @since 101.0.0
      */
     protected function getImportOptionsModalConfig()
     {
@@ -478,8 +505,7 @@ class CustomOptions extends AbstractModifier
                                 'ns' => static::CUSTOM_OPTIONS_LISTING,
                                 'render_url' => $this->urlBuilder->getUrl('mui/index/render'),
                                 'realTimeLink' => true,
-                                'behaviourType' => 'edit',
-                                'externalFilterMode' => true,
+                                'externalFilterMode' => false,
                                 'currentProductId' => $this->locator->getProduct()->getId(),
                                 'dataLinks' => [
                                     'imports' => false,
@@ -501,10 +527,11 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getCommonContainerConfig($sortOrder)
     {
-        return [
+        $commonContainer = [
             'arguments' => [
                 'data' => [
                     'config' => [
@@ -529,6 +556,10 @@ class CustomOptions extends AbstractModifier
                                     'label' => __('Option Title'),
                                     'component' => 'Magento_Catalog/component/static-type-input',
                                     'valueUpdate' => 'input',
+                                    'imports' => [
+                                        'optionId' => '${ $.provider }:${ $.parentScope }.option_id',
+                                        'isUseDefault' => '${ $.provider }:${ $.parentScope }.is_use_default'
+                                    ]
                                 ],
                             ],
                         ],
@@ -538,6 +569,19 @@ class CustomOptions extends AbstractModifier
                 static::FIELD_IS_REQUIRE_NAME => $this->getIsRequireFieldConfig(40)
             ]
         ];
+
+        if ($this->locator->getProduct()->getStoreId()) {
+            $useDefaultConfig = [
+                'service' => [
+                    'template' => 'Magento_Catalog/form/element/helper/custom-option-service',
+                ]
+            ];
+            $titlePath = $this->arrayManager->findPath(static::FIELD_TITLE_NAME, $commonContainer, null)
+                . static::META_CONFIG_PATH;
+            $commonContainer = $this->arrayManager->merge($titlePath, $commonContainer, $useDefaultConfig);
+        }
+
+        return $commonContainer;
     }
 
     /**
@@ -545,6 +589,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getStaticTypeContainerConfig($sortOrder)
     {
@@ -559,6 +604,8 @@ class CustomOptions extends AbstractModifier
                         'showLabel' => false,
                         'additionalClasses' => 'admin__field-group-columns admin__control-group-equal',
                         'sortOrder' => $sortOrder,
+                        'fieldTemplate' => 'Magento_Catalog/form/field',
+                        'visible' => false,
                     ],
                 ],
             ],
@@ -579,9 +626,27 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getSelectTypeGridConfig($sortOrder)
     {
+        $options = [
+            'arguments' => [
+                'data' => [
+                    'config' => [
+                        'imports' => [
+                            'optionId' => '${ $.provider }:${ $.parentScope }.option_id',
+                            'optionTypeId' => '${ $.provider }:${ $.parentScope }.option_type_id',
+                            'isUseDefault' => '${ $.provider }:${ $.parentScope }.is_use_default'
+                        ],
+                        'service' => [
+                            'template' => 'Magento_Catalog/form/element/helper/custom-option-type-service',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
         return [
             'arguments' => [
                 'data' => [
@@ -611,8 +676,11 @@ class CustomOptions extends AbstractModifier
                         ],
                     ],
                     'children' => [
-                        static::FIELD_TITLE_NAME => $this->getTitleFieldConfig(10),
-                        static::FIELD_PRICE_NAME => $this->getPriceFieldConfig(20),
+                        static::FIELD_TITLE_NAME => $this->getTitleFieldConfig(
+                            10,
+                            $this->locator->getProduct()->getStoreId() ? $options : []
+                        ),
+                        static::FIELD_PRICE_NAME => $this->getPriceFieldConfigForSelectType(20),
                         static::FIELD_PRICE_TYPE_NAME => $this->getPriceTypeFieldConfig(30, ['fit' => true]),
                         static::FIELD_SKU_NAME => $this->getSkuFieldConfig(40),
                         static::FIELD_SORT_ORDER_NAME => $this->getPositionFieldConfig(50),
@@ -628,6 +696,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getOptionIdFieldConfig($sortOrder)
     {
@@ -652,6 +721,7 @@ class CustomOptions extends AbstractModifier
      * @param int $sortOrder
      * @param array $options
      * @return array
+     * @since 101.0.0
      */
     protected function getTitleFieldConfig($sortOrder, array $options = [])
     {
@@ -682,6 +752,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getTypeFieldConfig($sortOrder)
     {
@@ -757,6 +828,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getIsRequireFieldConfig($sortOrder)
     {
@@ -786,6 +858,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getPositionFieldConfig($sortOrder)
     {
@@ -810,6 +883,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getIsDeleteFieldConfig($sortOrder)
     {
@@ -819,7 +893,7 @@ class CustomOptions extends AbstractModifier
                     'config' => [
                         'componentType' => ActionDelete::NAME,
                         'fit' => true,
-                        'sortOrder' => $sortOrder,
+                        'sortOrder' => $sortOrder
                     ],
                 ],
             ],
@@ -831,6 +905,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getPriceFieldConfig($sortOrder)
     {
@@ -840,13 +915,15 @@ class CustomOptions extends AbstractModifier
                     'config' => [
                         'label' => __('Price'),
                         'componentType' => Field::NAME,
+                        'component' => 'Magento_Catalog/js/components/custom-options-component',
                         'formElement' => Input::NAME,
                         'dataScope' => static::FIELD_PRICE_NAME,
                         'dataType' => Number::NAME,
                         'addbefore' => $this->getCurrencySymbol(),
+                        'addbeforePool' => $this->productOptionsPrice->prefixesToOptionArray(),
                         'sortOrder' => $sortOrder,
                         'validation' => [
-                            'validate-zero-or-greater' => true
+                            'validate-number' => true
                         ],
                     ],
                 ],
@@ -855,11 +932,26 @@ class CustomOptions extends AbstractModifier
     }
 
     /**
+     * Get config for "Price" field for select type.
+     *
+     * @param int $sortOrder
+     * @return array
+     */
+    private function getPriceFieldConfigForSelectType(int $sortOrder)
+    {
+        $priceFieldConfig = $this->getPriceFieldConfig($sortOrder);
+        $priceFieldConfig['arguments']['data']['config']['template'] = 'Magento_Catalog/form/field';
+
+        return $priceFieldConfig;
+    }
+
+    /**
      * Get config for "Price Type" field
      *
      * @param int $sortOrder
      * @param array $config
      * @return array
+     * @since 101.0.0
      */
     protected function getPriceTypeFieldConfig($sortOrder, array $config = [])
     {
@@ -869,12 +961,16 @@ class CustomOptions extends AbstractModifier
                     'data' => [
                         'config' => [
                             'label' => __('Price Type'),
+                            'component' => 'Magento_Catalog/js/components/custom-options-price-type',
                             'componentType' => Field::NAME,
                             'formElement' => Select::NAME,
                             'dataScope' => static::FIELD_PRICE_TYPE_NAME,
                             'dataType' => Text::NAME,
                             'sortOrder' => $sortOrder,
-                            'options' => $this->getPriceTypes(),
+                            'options' => $this->productOptionsPrice->toOptionArray(),
+                            'imports' => [
+                                'priceIndex' => self::FIELD_PRICE_NAME,
+                            ],
                         ],
                     ],
                 ],
@@ -888,6 +984,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getSkuFieldConfig($sortOrder)
     {
@@ -912,6 +1009,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getMaxCharactersFieldConfig($sortOrder)
     {
@@ -939,6 +1037,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getFileExtensionFieldConfig($sortOrder)
     {
@@ -947,11 +1046,15 @@ class CustomOptions extends AbstractModifier
                 'data' => [
                     'config' => [
                         'label' => __('Compatible File Extensions'),
+                        'notice' => __('Enter separated extensions, like: png, jpg, gif.'),
                         'componentType' => Field::NAME,
                         'formElement' => Input::NAME,
                         'dataScope' => static::FIELD_FILE_EXTENSION_NAME,
                         'dataType' => Text::NAME,
                         'sortOrder' => $sortOrder,
+                        'validation' => [
+                            'required-entry' => true,
+                        ],
                     ],
                 ],
             ],
@@ -963,6 +1066,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getImageSizeXFieldConfig($sortOrder)
     {
@@ -973,6 +1077,7 @@ class CustomOptions extends AbstractModifier
                         'label' => __('Maximum Image Size'),
                         'notice' => __('Please leave blank if it is not an image.'),
                         'addafter' => __('px.'),
+                        'component' => 'Magento_Catalog/js/components/custom-options-component',
                         'componentType' => Field::NAME,
                         'formElement' => Input::NAME,
                         'dataScope' => static::FIELD_IMAGE_SIZE_X_NAME,
@@ -992,6 +1097,7 @@ class CustomOptions extends AbstractModifier
      *
      * @param int $sortOrder
      * @return array
+     * @since 101.0.0
      */
     protected function getImageSizeYFieldConfig($sortOrder)
     {
@@ -1001,6 +1107,7 @@ class CustomOptions extends AbstractModifier
                     'config' => [
                         'label' => ' ',
                         'addafter' => __('px.'),
+                        'component' => 'Magento_Catalog/js/components/custom-options-component',
                         'componentType' => Field::NAME,
                         'formElement' => Input::NAME,
                         'dataScope' => static::FIELD_IMAGE_SIZE_Y_NAME,
@@ -1019,6 +1126,7 @@ class CustomOptions extends AbstractModifier
      * Get options for drop-down control with product option types
      *
      * @return array
+     * @since 101.0.0
      */
     protected function getProductOptionTypes()
     {
@@ -1052,36 +1160,10 @@ class CustomOptions extends AbstractModifier
     }
 
     /**
-     * Retrieve price types
-     *
-     * @return array
-     */
-    protected function getPriceTypes()
-    {
-        $priceTypes = $this->productOptionsPrice->toOptionArray();
-        $productType = $this->locator->getProduct()->getTypeId();
-        $exceptions = $this->getNotSupportedPriceTypes();
-
-        if (isset($exceptions[$productType])) {
-            $i = 0;
-
-            while ($i < count($priceTypes)) {
-                if (in_array($priceTypes[$i]['value'], $exceptions[$productType])) {
-                    unset($priceTypes[$i]);
-                    continue;
-                }
-
-                $i += 1;
-            }
-        }
-
-        return $priceTypes;
-    }
-
-    /**
      * Get currency symbol
      *
      * @return string
+     * @since 101.0.0
      */
     protected function getCurrencySymbol()
     {
@@ -1089,24 +1171,37 @@ class CustomOptions extends AbstractModifier
     }
 
     /**
-     * Get list of not supported product types
+     * The getter function to get the locale currency for real application code
      *
-     * @return array
+     * @return \Magento\Framework\Locale\CurrencyInterface
+     *
+     * @deprecated 101.0.0
      */
-    protected function getNotSupportedProductTypes()
+    private function getLocaleCurrency()
     {
-        return ['grouped'];
+        if ($this->localeCurrency === null) {
+            $this->localeCurrency = \Magento\Framework\App\ObjectManager::getInstance()->get(CurrencyInterface::class);
+        }
+        return $this->localeCurrency;
     }
 
     /**
-     * Get list of not supported price types per product type
+     * Format price according to the locale of the currency
      *
-     * @return array
+     * @param mixed $value
+     * @return string
+     * @since 101.0.0
      */
-    protected function getNotSupportedPriceTypes()
+    protected function formatPrice($value)
     {
-        return [
-            'configurable' => ['percent']
-        ];
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $store = $this->storeManager->getStore();
+        $currency = $this->getLocaleCurrency()->getCurrency($store->getBaseCurrencyCode());
+        $value = $currency->toCurrency($value, ['display' => \Magento\Framework\Currency::NO_SYMBOL]);
+
+        return $value;
     }
 }

@@ -1,30 +1,30 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Webapi\Model\Rest\Swagger;
 
+use Magento\Framework\Api\SimpleDataObjectConverter;
+use Magento\Framework\App\ProductMetadataInterface;
 use Magento\Framework\Reflection\TypeProcessor;
+use Magento\Framework\Webapi\Authorization;
+use Magento\Framework\Webapi\Exception as WebapiException;
 use Magento\Webapi\Controller\Rest;
 use Magento\Webapi\Model\AbstractSchemaGenerator;
 use Magento\Webapi\Model\Config\Converter;
 use Magento\Webapi\Model\Rest\Swagger;
 use Magento\Webapi\Model\Rest\SwaggerFactory;
-use Magento\Framework\Webapi\Authorization;
-use Magento\Framework\Webapi\Exception as WebapiException;
-use Magento\Framework\Exception\AuthenticationException;
-use Magento\Framework\Exception\AuthorizationException;
-use Magento\Framework\Exception\LocalizedException;
-use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Framework\Phrase;
-use Magento\Framework\App\ProductMetadataInterface;
+use Magento\Webapi\Model\ServiceMetadata;
 
 /**
  * REST Swagger schema generator.
  *
  * Generate REST API description in a format of JSON document,
  * compliant with {@link https://github.com/swagger-api/swagger-spec/blob/master/versions/2.0.md Swagger specification}
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  */
 class Generator extends AbstractSchemaGenerator
 {
@@ -39,7 +39,7 @@ class Generator extends AbstractSchemaGenerator
     const UNAUTHORIZED_DESCRIPTION = '401 Unauthorized';
 
     /** Array signifier */
-    const ARRAY_SIGNIFIER = '[]';
+    const ARRAY_SIGNIFIER = '[0]';
 
     /**
      * Swagger factory instance.
@@ -204,14 +204,17 @@ class Generator extends AbstractSchemaGenerator
     protected function generatePathInfo($methodName, $httpMethodData, $tagName)
     {
         $methodData = $httpMethodData[Converter::KEY_METHOD];
+
+        $operationId = $this->typeProcessor->getOperationName($tagName, $methodData[Converter::KEY_METHOD]);
+        $operationId .= ucfirst($methodName);
+
         $pathInfo = [
             'tags' => [$tagName],
             'description' => $methodData['documentation'],
-            'operationId' => $this->typeProcessor->getOperationName($tagName, $methodData[Converter::KEY_METHOD]) .
-                ucfirst($methodName)
+            'operationId' => $operationId,
         ];
 
-        $parameters = $this->generateMethodParameters($httpMethodData);
+        $parameters = $this->generateMethodParameters($httpMethodData, $operationId);
         if ($parameters) {
             $pathInfo['parameters'] = $parameters;
         }
@@ -265,19 +268,19 @@ class Generator extends AbstractSchemaGenerator
      * Generate parameters based on method data
      *
      * @param array $httpMethodData
+     * @param string $operationId
      * @return array
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      * @SuppressWarnings(PHPMD.NPathComplexity)
      */
-    private function generateMethodParameters($httpMethodData)
+    private function generateMethodParameters($httpMethodData, $operationId)
     {
         $bodySchema = [];
         $parameters = [];
 
         $phpMethodData = $httpMethodData[Converter::KEY_METHOD];
         /** Return nothing if necessary fields are not set */
-        if (
-            !isset($phpMethodData['interface']['in']['parameters'])
+        if (!isset($phpMethodData['interface']['in']['parameters'])
             || !isset($httpMethodData['uri'])
             || !isset($httpMethodData['httpOperation'])
         ) {
@@ -286,8 +289,7 @@ class Generator extends AbstractSchemaGenerator
 
         foreach ($phpMethodData['interface']['in']['parameters'] as $parameterName => $parameterInfo) {
             /** Omit forced parameters */
-            if (
-                isset($httpMethodData['parameters'][$parameterName]['force'])
+            if (isset($httpMethodData['parameters'][$parameterName]['force'])
                 && $httpMethodData['parameters'][$parameterName]['force']
             ) {
                 continue;
@@ -315,7 +317,6 @@ class Generator extends AbstractSchemaGenerator
                     $description,
                     $bodySchema
                 );
-
             }
         }
 
@@ -338,7 +339,7 @@ class Generator extends AbstractSchemaGenerator
 
         if ($bodySchema) {
             $bodyParam = [];
-            $bodyParam['name'] = '$body';
+            $bodyParam['name'] = $operationId . 'Body';
             $bodyParam['in'] = 'body';
             $bodyParam['schema'] = $bodySchema;
             $parameters[] = $bodyParam;
@@ -406,7 +407,7 @@ class Generator extends AbstractSchemaGenerator
             if ($simpleType = $this->getSimpleType($trimedTypeName)) {
                 $result['items'] = ['type' => $simpleType];
             } else {
-                if (strpos($typeName, '[]')) {
+                if (strpos($typeName, '[]') !== false) {
                     $result['items'] = ['$ref' => $this->getDefinitionReference($trimedTypeName)];
                 } else {
                     $result = ['$ref' => $this->getDefinitionReference($trimedTypeName)];
@@ -541,8 +542,50 @@ class Generator extends AbstractSchemaGenerator
                     ],
                 ],
             ],
-            $this->definitions
+            $this->snakeCaseDefinitions($this->definitions)
         );
+    }
+
+    /**
+     * Converts definitions' properties array to snake_case.
+     *
+     * @param array $definitions
+     * @return array
+     */
+    private function snakeCaseDefinitions($definitions)
+    {
+        foreach ($definitions as $name => $vals) {
+            if (!empty($vals['properties'])) {
+                $definitions[$name]['properties'] = $this->convertArrayToSnakeCase($vals['properties']);
+            }
+            if (!empty($vals['required'])) {
+                $snakeCaseRequired = [];
+                foreach ($vals['required'] as $requiredProperty) {
+                    $snakeCaseRequired[] = SimpleDataObjectConverter::camelCaseToSnakeCase($requiredProperty);
+                }
+                $definitions[$name]['required'] = $snakeCaseRequired;
+            }
+        }
+        return $definitions;
+    }
+
+    /**
+     * Converts associative array's key names from camelCase to snake_case, recursively.
+     *
+     * @param array $properties
+     * @return array
+     */
+    private function convertArrayToSnakeCase($properties)
+    {
+        foreach ($properties as $name => $value) {
+            $snakeCaseName = SimpleDataObjectConverter::camelCaseToSnakeCase($name);
+            if (is_array($value)) {
+                $value = $this->convertArrayToSnakeCase($value);
+            }
+            unset($properties[$name]);
+            $properties[$snakeCaseName] = $value;
+        }
+        return $properties;
     }
 
     /**
@@ -706,7 +749,8 @@ class Generator extends AbstractSchemaGenerator
     private function convertPathParams($uri)
     {
         $parts = explode('/', $uri);
-        for ($i=0; $i < count($parts); $i++) {
+        $count = count($parts);
+        for ($i=0; $i < $count; $i++) {
             if (strpos($parts[$i], ':') === 0) {
                 $parts[$i] = '{' . substr($parts[$i], 1) . '}';
             }
@@ -819,9 +863,17 @@ class Generator extends AbstractSchemaGenerator
             if (isset($parameters['result']['type'])) {
                 $schema = $this->getObjectSchema($parameters['result']['type'], $description);
             }
-            $responses['200']['description'] = '200 Success.';
+
+            // Some methods may have a non-standard HTTP success code.
+            $specificResponseData = $parameters['result']['response_codes']['success'] ?? [];
+            // Default HTTP success code to 200 if nothing has been supplied.
+            $responseCode = $specificResponseData['code'] ?? '200';
+            // Default HTTP response status to 200 Success if nothing has been supplied.
+            $responseDescription = $specificResponseData['description'] ?? '200 Success.';
+
+            $responses[$responseCode]['description'] = $responseDescription;
             if (!empty($schema)) {
-                $responses['200']['schema'] = $schema;
+                $responses[$responseCode]['schema'] = $schema;
             }
         }
         return $responses;
@@ -838,13 +890,13 @@ class Generator extends AbstractSchemaGenerator
     {
         $httpCode = '500';
         $description = 'Internal Server error';
-        if (is_subclass_of($exceptionClass, '\Magento\Framework\Exception\LocalizedException')) {
+        if (is_subclass_of($exceptionClass, \Magento\Framework\Exception\LocalizedException::class)) {
             // Map HTTP codes for LocalizedExceptions according to exception type
-            if (is_subclass_of($exceptionClass, '\Magento\Framework\Exception\NoSuchEntityException')) {
+            if (is_subclass_of($exceptionClass, \Magento\Framework\Exception\NoSuchEntityException::class)) {
                 $httpCode = WebapiException::HTTP_NOT_FOUND;
                 $description = '404 Not Found';
-            } elseif (is_subclass_of($exceptionClass, '\Magento\Framework\Exception\AuthorizationException')
-                || is_subclass_of($exceptionClass, '\Magento\Framework\Exception\AuthenticationException')
+            } elseif (is_subclass_of($exceptionClass, \Magento\Framework\Exception\AuthorizationException::class)
+                || is_subclass_of($exceptionClass, \Magento\Framework\Exception\AuthenticationException::class)
             ) {
                 $httpCode = WebapiException::HTTP_UNAUTHORIZED;
                 $description = self::UNAUTHORIZED_DESCRIPTION;
@@ -858,5 +910,24 @@ class Generator extends AbstractSchemaGenerator
         $responses[$httpCode]['schema']['$ref'] = self::ERROR_SCHEMA;
 
         return $responses;
+    }
+
+    /**
+     * Retrieve a list of services visible to current user.
+     *
+     * @return string[]
+     */
+    public function getListOfServices()
+    {
+        $listOfAllowedServices = [];
+        foreach ($this->serviceMetadata->getServicesConfig() as $serviceName => $service) {
+            foreach ($service[ServiceMetadata::KEY_SERVICE_METHODS] as $method) {
+                if ($this->authorization->isAllowed($method[ServiceMetadata::KEY_ACL_RESOURCES])) {
+                    $listOfAllowedServices[] = $serviceName;
+                    break;
+                }
+            }
+        }
+        return $listOfAllowedServices;
     }
 }

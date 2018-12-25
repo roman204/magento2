@@ -1,16 +1,20 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\CatalogInventory\Ui\DataProvider\Product\Form\Modifier;
 
+use Magento\Catalog\Controller\Adminhtml\Product\Initialization\StockDataFilter;
 use Magento\Catalog\Model\Locator\LocatorInterface;
 use Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\AbstractModifier;
+use Magento\CatalogInventory\Api\Data\StockItemInterface;
+use Magento\CatalogInventory\Api\StockConfigurationInterface;
 use Magento\CatalogInventory\Api\StockRegistryInterface;
-use Magento\CatalogInventory\Model\Source\Stock;
-use Magento\Catalog\Ui\DataProvider\Grouper;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Framework\Stdlib\ArrayManager;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\Serialize\JsonValidator;
 
 /**
  * Data provider for advanced inventory form
@@ -22,12 +26,7 @@ class AdvancedInventory extends AbstractModifier
     /**
      * @var LocatorInterface
      */
-    protected $locator;
-
-    /**
-     * @var Grouper
-     */
-    protected $grouper;
+    private $locator;
 
     /**
      * @var StockRegistryInterface
@@ -35,39 +34,54 @@ class AdvancedInventory extends AbstractModifier
     private $stockRegistry;
 
     /**
-     * @var Stock
-     */
-    private $stock;
-
-    /**
      * @var ArrayManager
      */
-    protected $arrayManager;
+    private $arrayManager;
+
+    /**
+     * @var StockConfigurationInterface
+     */
+    private $stockConfiguration;
 
     /**
      * @var array
      */
-    protected $meta = [];
+    private $meta = [];
 
     /**
+     * @var Json
+     */
+    private $serializer;
+
+    /**
+     * @var JsonValidator
+     */
+    private $jsonValidator;
+
+    /**
+     * Constructor
+     *
      * @param LocatorInterface $locator
-     * @param Grouper $grouper
-     * @param Stock $stock
      * @param StockRegistryInterface $stockRegistry
      * @param ArrayManager $arrayManager
+     * @param StockConfigurationInterface $stockConfiguration
+     * @param Json|null $serializer
+     * @param JsonValidator|null $jsonValidator
      */
     public function __construct(
         LocatorInterface $locator,
-        Grouper $grouper,
-        Stock $stock,
         StockRegistryInterface $stockRegistry,
-        ArrayManager $arrayManager
+        ArrayManager $arrayManager,
+        StockConfigurationInterface $stockConfiguration,
+        Json $serializer = null,
+        JsonValidator $jsonValidator = null
     ) {
         $this->locator = $locator;
-        $this->grouper = $grouper;
         $this->stockRegistry = $stockRegistry;
-        $this->stock = $stock;
         $this->arrayManager = $arrayManager;
+        $this->stockConfiguration = $stockConfiguration;
+        $this->serializer = $serializer ?: ObjectManager::getInstance()->get(Json::class);
+        $this->jsonValidator = $jsonValidator ?: ObjectManager::getInstance()->get(JsonValidator::class);
     }
 
     /**
@@ -80,12 +94,13 @@ class AdvancedInventory extends AbstractModifier
         $model = $this->locator->getProduct();
         $modelId = $model->getId();
 
+        /** @var StockItemInterface $stockItem */
         $stockItem = $this->stockRegistry->getStockItem(
             $modelId,
             $model->getStore()->getWebsiteId()
         );
 
-        $stockData = $stockItem->getData();
+        $stockData = $modelId ? $this->getData($stockItem) : [];
         if (!empty($stockData)) {
             $data[$modelId][self::DATA_SOURCE_DEFAULT][self::STOCK_DATA_FIELDS] = $stockData;
         }
@@ -94,34 +109,57 @@ class AdvancedInventory extends AbstractModifier
                 (int)$stockData['is_in_stock'];
         }
 
-        return $this->prepareStockData($data);
-    }
+        if (!empty($this->stockConfiguration->getDefaultConfigValue(StockItemInterface::MIN_SALE_QTY))) {
+            $minSaleQtyData = $this->stockConfiguration->getDefaultConfigValue(StockItemInterface::MIN_SALE_QTY);
 
-    /**
-     * Prepare data for stock_data fields
-     *
-     * @param array $data
-     * @return array
-     */
-    protected function prepareStockData(array $data)
-    {
-        $productId = $this->locator->getProduct()->getId();
-        $stockDataFields = [
-            'qty_increments',
-            'min_qty',
-            'min_sale_qty',
-            'max_sale_qty',
-            'notify_stock_qty',
-        ];
-
-        foreach ($stockDataFields as $field) {
-            if (isset($data[$productId][self::DATA_SOURCE_DEFAULT][self::STOCK_DATA_FIELDS][$field])) {
-                $data[$productId][self::DATA_SOURCE_DEFAULT][self::STOCK_DATA_FIELDS][$field] =
-                    (float)$data[$productId][self::DATA_SOURCE_DEFAULT][self::STOCK_DATA_FIELDS][$field];
+            if (is_string($minSaleQtyData) && $this->jsonValidator->isValid($minSaleQtyData)) {
+                // Set data source for dynamicRows minimum qty allowed in shopping cart
+                $unserializedMinSaleQty = $this->serializer->unserialize($minSaleQtyData);
+                if (is_array($unserializedMinSaleQty)) {
+                    $minSaleQtyData = array_map(
+                        function ($group, $qty) {
+                            return [
+                                StockItemInterface::CUSTOMER_GROUP_ID => $group,
+                                StockItemInterface::MIN_SALE_QTY => $qty
+                            ];
+                        },
+                        array_keys($unserializedMinSaleQty),
+                        array_values($unserializedMinSaleQty)
+                    );
+                }
             }
+
+            $path = $modelId . '/' . self::DATA_SOURCE_DEFAULT . '/stock_data/min_qty_allowed_in_shopping_cart';
+            $data = $this->arrayManager->set($path, $data, $minSaleQtyData);
         }
 
         return $data;
+    }
+
+    /**
+     * Get Stock Data
+     *
+     * @param StockItemInterface $stockItem
+     * @return array
+     */
+    private function getData(StockItemInterface $stockItem)
+    {
+        $result = $stockItem->getData();
+
+        $result[StockItemInterface::MANAGE_STOCK] = (int)$stockItem->getManageStock();
+        $result[StockItemInterface::QTY] = (float)$stockItem->getQty();
+        $result[StockItemInterface::MIN_QTY] = (float)$stockItem->getMinQty();
+        $result[StockItemInterface::MIN_SALE_QTY] = (float)$stockItem->getMinSaleQty();
+        $result[StockItemInterface::MAX_SALE_QTY] = (float)$stockItem->getMaxSaleQty();
+        $result[StockItemInterface::IS_QTY_DECIMAL] = (int)$stockItem->getIsQtyDecimal();
+        $result[StockItemInterface::IS_DECIMAL_DIVIDED]= (int)$stockItem->getIsDecimalDivided();
+        $result[StockItemInterface::BACKORDERS] = (int)$stockItem->getBackorders();
+        $result[StockItemInterface::NOTIFY_STOCK_QTY] = (float)$stockItem->getNotifyStockQty();
+        $result[StockItemInterface::ENABLE_QTY_INCREMENTS] = (int)$stockItem->getEnableQtyIncrements();
+        $result[StockItemInterface::QTY_INCREMENTS] = (float)$stockItem->getQtyIncrements();
+        $result[StockItemInterface::IS_IN_STOCK] = (int)$stockItem->getIsInStock();
+
+        return $result;
     }
 
     /**
@@ -142,7 +180,7 @@ class AdvancedInventory extends AbstractModifier
     private function prepareMeta()
     {
         $fieldCode = 'quantity_and_stock_status';
-        $pathField = $this->getElementArrayPath($this->meta, $fieldCode);
+        $pathField = $this->arrayManager->findPath($fieldCode, $this->meta, null, 'children');
 
         if ($pathField) {
             $labelField = $this->arrayManager->get(
@@ -159,6 +197,9 @@ class AdvancedInventory extends AbstractModifier
                     'value' => '1',
                     'dataScope' => $fieldCode . '.is_in_stock',
                     'scopeLabel' => '[GLOBAL]',
+                    'imports' => [
+                        'visible' => '${$.provider}:data.product.stock_data.manage_stock',
+                    ],
                 ]
             );
             $this->meta = $this->arrayManager->merge(
@@ -179,11 +220,11 @@ class AdvancedInventory extends AbstractModifier
                 'dataScope' => $fieldCode,
                 'scopeLabel' => '[GLOBAL]',
                 'source' => 'product_details',
-                'sortOrder' =>
-                    (int) $this->arrayManager->get(
-                        $this->arrayManager->slicePath($pathField, 0, -2) . '/arguments/data/config/sortOrder',
-                        $this->meta
-                    ) - 1,
+                'sortOrder' => (int) $this->arrayManager->get(
+                    $this->arrayManager->slicePath($pathField, 0, -2) . '/arguments/data/config/sortOrder',
+                    $this->meta
+                ) - 1,
+                'disabled' => $this->locator->getProduct()->isLockedAttribute($fieldCode),
             ];
             $qty['arguments']['data']['config'] = [
                 'component' => 'Magento_CatalogInventory/js/components/qty-validator-changer',
@@ -193,10 +234,12 @@ class AdvancedInventory extends AbstractModifier
                 'visible' => '1',
                 'require' => '0',
                 'additionalClasses' => 'admin__field-small',
+                'label' => __('Quantity'),
+                'scopeLabel' => '[GLOBAL]',
                 'dataScope' => 'qty',
                 'validation' => [
                     'validate-number' => true,
-                    'validate-digits' => true,
+                    'less-than-equals-to' => StockDataFilter::MAX_QTY_VALUE,
                 ],
                 'imports' => [
                     'handleChanges' => '${$.provider}:data.product.stock_data.is_qty_decimal',

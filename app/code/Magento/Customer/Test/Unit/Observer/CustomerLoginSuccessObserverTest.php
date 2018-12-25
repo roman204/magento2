@@ -1,34 +1,25 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Test\Unit\Observer;
 
+use Magento\Customer\Model\AuthenticationInterface;
 use Magento\Framework\Event\Observer;
 use Magento\Customer\Observer\CustomerLoginSuccessObserver;
 
 /**
  * Class CustomerLoginSuccessObserverTest
  */
-class CustomerLoginSuccessObserverTest extends \PHPUnit_Framework_TestCase
+class CustomerLoginSuccessObserverTest extends \PHPUnit\Framework\TestCase
 {
     /**
-     * Account manager
+     * Authentication
      *
-     * @var \Magento\Customer\Helper\AccountManagement
+     * @var AuthenticationInterface
      */
-    protected $accountManagementHelperMock;
-
-    /**
-     * @var \Magento\Customer\Api\CustomerRepositoryInterface
-     */
-    protected $customerRepositoryMock;
-
-    /**
-     * @var \Magento\Customer\Model\Data\Customer
-     */
-    protected $customerDataMock;
+    protected $authenticationMock;
 
     /**
      * @var \Magento\Customer\Model\Customer
@@ -45,34 +36,11 @@ class CustomerLoginSuccessObserverTest extends \PHPUnit_Framework_TestCase
      */
     public function setUp()
     {
-        $this->accountManagementHelperMock = $this->getMock(
-            'Magento\Customer\Helper\AccountManagement',
-            ['processUnlockData'],
-            [],
-            '',
-            false
-        );
-        $this->customerDataMock = $this->getMock(
-            'Magento\Customer\Model\Data\Customer',
-            ['getId'],
-            [],
-            '',
-            false
-        );
-        $this->customerModelMock = $this->getMock(
-            'Magento\Customer\Model\Customer',
-            ['getId'],
-            [],
-            '',
-            false
-        );
-        $this->customerRepositoryMock = $this->getMockBuilder('Magento\Customer\Api\CustomerRepositoryInterface')
-            ->setMethods(['getById', 'save'])
-            ->disableOriginalConstructor()
-            ->getMockForAbstractClass();
+        $this->authenticationMock = $this->createMock(AuthenticationInterface::class);
+
+        $this->customerModelMock = $this->createPartialMock(\Magento\Customer\Model\Customer::class, ['getId']);
         $this->customerLoginSuccessObserver = new CustomerLoginSuccessObserver(
-            $this->accountManagementHelperMock,
-            $this->customerRepositoryMock
+            $this->authenticationMock
         );
     }
 
@@ -82,8 +50,8 @@ class CustomerLoginSuccessObserverTest extends \PHPUnit_Framework_TestCase
     public function testExecute()
     {
         $customerId = 1;
-        $observerMock = $this->getMock('Magento\Framework\Event\Observer', [], [], '', false);
-        $eventMock = $this->getMock('Magento\Framework\Event', ['getData'], [], '', false);
+        $observerMock = $this->createMock(\Magento\Framework\Event\Observer::class);
+        $eventMock = $this->createPartialMock(\Magento\Framework\Event::class, ['getData']);
         $observerMock->expects($this->once())
             ->method('getEvent')
             ->willReturn($eventMock);
@@ -94,16 +62,9 @@ class CustomerLoginSuccessObserverTest extends \PHPUnit_Framework_TestCase
         $this->customerModelMock->expects($this->once())
             ->method('getId')
             ->willReturn($customerId);
-        $this->customerRepositoryMock->expects($this->once())
-            ->method('getById')
-            ->willReturn($this->customerDataMock);
-        $this->customerDataMock->expects($this->once())->method('getId')->willReturn($customerId);
-        $this->accountManagementHelperMock->expects($this->once())
-            ->method('processUnlockData')
+        $this->authenticationMock->expects($this->once())
+            ->method('unlock')
             ->with($customerId);
-        $this->customerRepositoryMock->expects($this->once())
-            ->method('save')
-            ->with($this->customerDataMock);
         $this->customerLoginSuccessObserver->execute($observerMock);
     }
 }

@@ -1,17 +1,20 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Ui\DataProvider\Product\Form\Modifier;
 
+use Magento\Framework\Pricing\PriceCurrencyInterface;
 use Magento\Ui\DataProvider\Modifier\ModifierInterface;
-use Magento\Framework\Stdlib\ArrayManager;
 
 /**
  * Class AbstractModifier
  *
+ * @api
+ *
  * @SuppressWarnings(PHPMD.NumberOfChildren)
+ * @since 101.0.0
  */
 abstract class AbstractModifier implements ModifierInterface
 {
@@ -34,6 +37,9 @@ abstract class AbstractModifier implements ModifierInterface
      */
     const CONTAINER_PREFIX = 'container_';
 
+    /**
+     * Meta config path
+     */
     const META_CONFIG_PATH = '/arguments/data/config';
 
     /**
@@ -44,14 +50,15 @@ abstract class AbstractModifier implements ModifierInterface
      * @param int $defaultSortOrder
      * @param int $iteration
      * @return int
+     * @since 101.0.0
      */
     protected function getNextGroupSortOrder(array $meta, $groupCodes, $defaultSortOrder, $iteration = 1)
     {
         $groupCodes = (array)$groupCodes;
 
         foreach ($groupCodes as $groupCode) {
-            if (isset($meta[$groupCode]['sortOrder'])) {
-                return $meta[$groupCode]['sortOrder'] + $iteration;
+            if (isset($meta[$groupCode]['arguments']['data']['config']['sortOrder'])) {
+                return $meta[$groupCode]['arguments']['data']['config']['sortOrder'] + $iteration;
             }
         }
 
@@ -66,6 +73,7 @@ abstract class AbstractModifier implements ModifierInterface
      * @param int $defaultSortOrder
      * @param int $iteration
      * @return int
+     * @since 101.0.0
      */
     protected function getNextAttributeSortOrder(array $meta, $attributeCodes, $defaultSortOrder, $iteration = 1)
     {
@@ -103,8 +111,7 @@ abstract class AbstractModifier implements ModifierInterface
                         $defaultSortOrder,
                         $iteration
                     );
-                } elseif (
-                    in_array($attributeCode, $attributeCodes)
+                } elseif (in_array($attributeCode, $attributeCodes)
                     && isset($attributeMeta['arguments']['data']['config']['sortOrder'])
                 ) {
                     $defaultSortOrder = $attributeMeta['arguments']['data']['config']['sortOrder'] + $iteration;
@@ -121,6 +128,7 @@ abstract class AbstractModifier implements ModifierInterface
      * @param string $haystack
      * @param string $needle
      * @return bool
+     * @since 101.0.0
      */
     protected function startsWith($haystack, $needle)
     {
@@ -132,6 +140,7 @@ abstract class AbstractModifier implements ModifierInterface
      *
      * @param array $meta
      * @return string
+     * @since 101.0.0
      */
     protected function getGeneralPanelName(array $meta)
     {
@@ -143,12 +152,26 @@ abstract class AbstractModifier implements ModifierInterface
             return self::DEFAULT_GENERAL_PANEL;
         }
 
-        $min = self::GENERAL_PANEL_ORDER;
+        return $this->getFirstPanelCode($meta);
+    }
+
+    /**
+     * Retrieve first panel name
+     *
+     * @param array $meta
+     * @return string|null
+     * @since 101.0.0
+     */
+    protected function getFirstPanelCode(array $meta)
+    {
+        $min = null;
         $name = null;
 
         foreach ($meta as $fieldSetName => $fieldSetMeta) {
-            if (isset($fieldSetMeta['sortOrder']) && $fieldSetMeta['sortOrder'] <= $min) {
-                $min = $fieldSetMeta['sortOrder'];
+            if (isset($fieldSetMeta['arguments']['data']['config']['sortOrder'])
+                && (null === $min || $fieldSetMeta['arguments']['data']['config']['sortOrder'] <= $min)
+            ) {
+                $min = $fieldSetMeta['arguments']['data']['config']['sortOrder'];
                 $name = $fieldSetName;
             }
         }
@@ -162,11 +185,14 @@ abstract class AbstractModifier implements ModifierInterface
      * @param array $meta
      * @param string $field
      * @return string|bool
+     * @since 101.0.0
      */
     protected function getGroupCodeByField(array $meta, $field)
     {
         foreach ($meta as $groupCode => $groupData) {
-            if (isset($groupData['children'][$field]) || isset($groupData['children']['container_' . $field])) {
+            if (isset($groupData['children'][$field])
+                || isset($groupData['children'][static::CONTAINER_PREFIX . $field])
+            ) {
                 return $groupCode;
             }
         }
@@ -175,37 +201,26 @@ abstract class AbstractModifier implements ModifierInterface
     }
 
     /**
-     * Get path string for specific element
+     * Format price to have only two decimals after delimiter
      *
-     * @param array $meta
-     * @param string $element
-     * @param string $delimiter
-     * @return string|null
+     * @param mixed $value
+     * @return string
+     * @since 101.0.0
      */
-    protected function getElementArrayPath(array $meta, $element, $delimiter = ArrayManager::DEFAULT_PATH_DELIMITER)
+    protected function formatPrice($value)
     {
-        $checkList = ['' => $meta];
+        return $value !== null ? number_format((float)$value, PriceCurrencyInterface::DEFAULT_PRECISION, '.', '') : '';
+    }
 
-        while (!empty($checkList)) {
-            $nextCheckList = [];
-
-            foreach ($checkList as $path => $children) {
-                foreach ($children as $index => $config) {
-                    $childPath = $path . ($path ? $delimiter . 'children' . $delimiter : '') . $index;
-
-                    if ($index === $element) {
-                        return $childPath;
-                    }
-
-                    if (!empty($config['children']) && is_array($config['children'])) {
-                        $nextCheckList[$childPath] = $config['children'];
-                    }
-                }
-            }
-
-            $checkList = $nextCheckList;
-        }
-
-        return null;
+    /**
+     * Strip excessive decimal digits from weight number
+     *
+     * @param mixed $value
+     * @return string
+     * @since 101.0.0
+     */
+    protected function formatWeight($value)
+    {
+        return (float)$value;
     }
 }

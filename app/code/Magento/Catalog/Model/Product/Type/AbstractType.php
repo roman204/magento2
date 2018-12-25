@@ -1,12 +1,13 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\Product\Type;
 
 use Magento\Catalog\Api\ProductRepositoryInterface;
 use Magento\Framework\App\Filesystem\DirectoryList;
+use Magento\Framework\Exception\LocalizedException;
 
 /**
  * @api
@@ -15,6 +16,7 @@ use Magento\Framework\App\Filesystem\DirectoryList;
  * @SuppressWarnings(PHPMD.TooManyFields)
  * @SuppressWarnings(PHPMD.ExcessiveClassComplexity)
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
 abstract class AbstractType
 {
@@ -161,6 +163,14 @@ abstract class AbstractType
     protected $productRepository;
 
     /**
+     * Serializer interface instance.
+     *
+     * @var \Magento\Framework\Serialize\Serializer\Json
+     * @since 101.1.0
+     */
+    protected $serializer;
+
+    /**
      * Construct
      *
      * @param \Magento\Catalog\Model\Product\Option $catalogProductOption
@@ -172,6 +182,7 @@ abstract class AbstractType
      * @param \Magento\Framework\Registry $coreRegistry
      * @param \Psr\Log\LoggerInterface $logger
      * @param ProductRepositoryInterface $productRepository
+     * @param \Magento\Framework\Serialize\Serializer\Json|null $serializer
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
@@ -183,7 +194,8 @@ abstract class AbstractType
         \Magento\Framework\Filesystem $filesystem,
         \Magento\Framework\Registry $coreRegistry,
         \Psr\Log\LoggerInterface $logger,
-        ProductRepositoryInterface $productRepository
+        ProductRepositoryInterface $productRepository,
+        \Magento\Framework\Serialize\Serializer\Json $serializer = null
     ) {
         $this->_catalogProductOption = $catalogProductOption;
         $this->_eavConfig = $eavConfig;
@@ -194,6 +206,8 @@ abstract class AbstractType
         $this->_filesystem = $filesystem;
         $this->_logger = $logger;
         $this->productRepository = $productRepository;
+        $this->serializer = $serializer ?: \Magento\Framework\App\ObjectManager::getInstance()
+            ->get(\Magento\Framework\Serialize\Serializer\Json::class);
     }
 
     /**
@@ -237,7 +251,7 @@ abstract class AbstractType
     }
 
     /**
-     * Retrieve parent ids array by requered child
+     * Retrieve parent ids array by required child
      *
      * @param int|array $childId
      * @return array
@@ -277,13 +291,7 @@ abstract class AbstractType
         $sortOne = $attributeOne->getGroupSortPath() * 1000 + $attributeOne->getSortPath() * 0.0001;
         $sortTwo = $attributeTwo->getGroupSortPath() * 1000 + $attributeTwo->getSortPath() * 0.0001;
 
-        if ($sortOne > $sortTwo) {
-            return 1;
-        } elseif ($sortOne < $sortTwo) {
-            return -1;
-        }
-
-        return 0;
+        return $sortOne <=> $sortTwo;
     }
 
     /**
@@ -393,8 +401,7 @@ abstract class AbstractType
         $product->prepareCustomOptions();
         $buyRequest->unsetData('_processing_params');
         // One-time params only
-        $product->addCustomOption('info_buyRequest', serialize($buyRequest->getData()));
-
+        $product->addCustomOption('info_buyRequest', $this->serializer->serialize($buyRequest->getData()));
         if ($options) {
             $optionIds = array_keys($options);
             $product->addCustomOption('option_ids', implode(',', $optionIds));
@@ -561,29 +568,39 @@ abstract class AbstractType
      * @param \Magento\Catalog\Model\Product $product
      * @param string $processMode
      * @return array
+     * @throws LocalizedException
      */
     protected function _prepareOptions(\Magento\Framework\DataObject $buyRequest, $product, $processMode)
     {
-        $transport = new \StdClass();
+        $transport = new \stdClass();
         $transport->options = [];
         $options = null;
         if ($product->getHasOptions()) {
             $options = $product->getOptions();
         }
         if ($options !== null) {
+            $results = [];
             foreach ($options as $option) {
                 /* @var $option \Magento\Catalog\Model\Product\Option */
-                $group = $option->groupFactory($option->getType())
-                    ->setOption($option)
-                    ->setProduct($product)
-                    ->setRequest($buyRequest)
-                    ->setProcessMode($processMode)
-                    ->validateUserValue($buyRequest->getOptions());
+                try {
+                    $group = $option->groupFactory($option->getType())
+                        ->setOption($option)
+                        ->setProduct($product)
+                        ->setRequest($buyRequest)
+                        ->setProcessMode($processMode)
+                        ->validateUserValue($buyRequest->getOptions());
+                } catch (LocalizedException $e) {
+                    $results[] = $e->getMessage();
+                    continue;
+                }
 
                 $preparedValue = $group->prepareForCart();
                 if ($preparedValue !== null) {
                     $transport->options[$option->getId()] = $preparedValue;
                 }
+            }
+            if (count($results) > 0) {
+                throw new LocalizedException(__(implode("\n", $results)));
             }
         }
 
@@ -634,7 +651,7 @@ abstract class AbstractType
         $optionArr = [];
         $info = $product->getCustomOption('info_buyRequest');
         if ($info) {
-            $optionArr['info_buyRequest'] = unserialize($info->getValue());
+            $optionArr['info_buyRequest'] = $this->serializer->unserialize($info->getValue());
         }
 
         $optionIds = $product->getCustomOption('option_ids');
@@ -702,8 +719,7 @@ abstract class AbstractType
     protected function _removeNotApplicableAttributes($product)
     {
         $entityType = $product->getResource()->getEntityType();
-        foreach ($this->_eavConfig->getEntityAttributeCodes($entityType, $product) as $attributeCode) {
-            $attribute = $this->_eavConfig->getAttribute($entityType, $attributeCode);
+        foreach ($this->_eavConfig->getEntityAttributes($entityType, $product) as $attribute) {
             $applyTo = $attribute->getApplyTo();
             if (is_array($applyTo) && count($applyTo) > 0 && !in_array($product->getTypeId(), $applyTo)) {
                 $product->unsetData($attribute->getAttributeCode());
@@ -916,7 +932,7 @@ abstract class AbstractType
      */
     public function prepareQuoteItemQty($qty, $product)
     {
-        return floatval($qty);
+        return (float)$qty;
     }
 
     /**
@@ -1080,5 +1096,17 @@ abstract class AbstractType
     public function getAssociatedProducts($product)
     {
         return [];
+    }
+
+    /**
+     * Check if product can be potentially buyed from the category page or some other list
+     *
+     * @param \Magento\Catalog\Model\Product $product
+     * @return bool
+     * @since 101.1.0
+     */
+    public function isPossibleBuyFromList($product)
+    {
+        return !$this->hasRequiredOptions($product);
     }
 }

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -18,6 +18,7 @@ class InstallSchema implements InstallSchemaInterface
     /**
      * {@inheritdoc}
      * @SuppressWarnings(PHPMD.ExcessiveMethodLength)
+     * @throws \Zend_Db_Exception
      */
     public function install(SchemaSetupInterface $setup, ModuleContextInterface $context)
     {
@@ -673,7 +674,7 @@ class InstallSchema implements InstallSchemaInterface
                 \Magento\Framework\DB\Ddl\Table::TYPE_SMALLINT,
                 null,
                 ['unsigned' => true, 'nullable' => false, 'default' => '0'],
-                'Attriute Set ID'
+                'Attribute Set ID'
             )
             ->addColumn(
                 'parent_id',
@@ -1232,6 +1233,15 @@ class InstallSchema implements InstallSchemaInterface
             ->addIndex(
                 $installer->getIdxName('catalog_category_product', ['product_id']),
                 ['product_id']
+            )
+            ->addIndex(
+                $installer->getIdxName(
+                    'catalog_category_product',
+                    ['category_id', 'product_id'],
+                    \Magento\Framework\DB\Adapter\AdapterInterface::INDEX_TYPE_UNIQUE
+                ),
+                ['category_id', 'product_id'],
+                ['type' => \Magento\Framework\DB\Adapter\AdapterInterface::INDEX_TYPE_UNIQUE]
             )
             ->addForeignKey(
                 $installer->getFkName('catalog_category_product', 'product_id', 'catalog_product_entity', 'entity_id'),
@@ -1844,6 +1854,9 @@ class InstallSchema implements InstallSchemaInterface
         $installer->getConnection()
             ->createTable($table);
 
+        $customerGroupTable = $setup->getConnection()->describeTable($setup->getTable('customer_group'));
+        $customerGroupIdType = $customerGroupTable['customer_group_id']['DATA_TYPE'] == 'int'
+            ? \Magento\Framework\DB\Ddl\Table::TYPE_INTEGER : $customerGroupTable['customer_group_id']['DATA_TYPE'];
         /**
          * Create table 'catalog_product_entity_tier_price'
          */
@@ -1874,7 +1887,7 @@ class InstallSchema implements InstallSchemaInterface
             )
             ->addColumn(
                 'customer_group_id',
-                \Magento\Framework\DB\Ddl\Table::TYPE_SMALLINT,
+                $customerGroupIdType,
                 null,
                 ['unsigned' => true, 'nullable' => false, 'default' => '0'],
                 'Customer Group ID'
@@ -2009,18 +2022,6 @@ class InstallSchema implements InstallSchemaInterface
                 'attribute_id',
                 \Magento\Framework\DB\Ddl\Table::ACTION_CASCADE
             )
-            ->addForeignKey(
-                $installer->getFkName(
-                    'catalog_product_entity_media_gallery',
-                    'entity_id',
-                    'catalog_product_entity',
-                    'entity_id'
-                ),
-                'entity_id',
-                $installer->getTable('catalog_product_entity'),
-                'entity_id',
-                \Magento\Framework\DB\Ddl\Table::ACTION_CASCADE
-            )
             ->setComment(
                 'Catalog Product Media Gallery Attribute Backend Table'
             );
@@ -2075,6 +2076,13 @@ class InstallSchema implements InstallSchemaInterface
                 null,
                 ['unsigned' => true, 'nullable' => false, 'default' => '0'],
                 'Is Disabled'
+            )
+            ->addIndex(
+                $installer->getIdxName(
+                    'catalog_product_entity_media_gallery_value',
+                    ['entity_id', 'value_id', 'store_id']
+                ),
+                ['entity_id', 'value_id', 'store_id']
             )
             ->addIndex(
                 $installer->getIdxName('catalog_product_entity_media_gallery_value', ['store_id']),
@@ -2417,7 +2425,6 @@ class InstallSchema implements InstallSchemaInterface
                 'option_id',
                 $installer->getTable('catalog_product_option'),
                 'option_id',
-                \Magento\Framework\DB\Ddl\Table::ACTION_CASCADE,
                 \Magento\Framework\DB\Ddl\Table::ACTION_CASCADE
             )
             ->setComment(
@@ -2928,7 +2935,7 @@ class InstallSchema implements InstallSchemaInterface
             )
             ->addColumn(
                 'customer_group_id',
-                \Magento\Framework\DB\Ddl\Table::TYPE_SMALLINT,
+                $customerGroupIdType,
                 null,
                 ['unsigned' => true, 'nullable' => false, 'primary' => true],
                 'Customer Group ID'
@@ -3047,7 +3054,7 @@ class InstallSchema implements InstallSchemaInterface
             )
             ->addColumn(
                 'customer_group_id',
-                \Magento\Framework\DB\Ddl\Table::TYPE_SMALLINT,
+                $customerGroupIdType,
                 null,
                 ['unsigned' => true, 'nullable' => false, 'primary' => true],
                 'Customer Group ID'
@@ -4260,7 +4267,6 @@ class InstallSchema implements InstallSchemaInterface
         $installer->getConnection()
             ->createTable($table);
 
-         $installer->endSetup();
-
+        $installer->endSetup();
     }
 }

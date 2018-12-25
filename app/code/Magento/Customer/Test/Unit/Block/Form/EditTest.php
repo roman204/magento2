@@ -1,19 +1,20 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Test\Unit\Block\Form;
 
 use Magento\Customer\Model\AccountManagement;
+use Magento\Framework\App\Config\ScopeConfigInterface;
 
 /**
  * Test class for \Magento\Customer\Block\Form\Edit
  */
-class EditTest extends \PHPUnit_Framework_TestCase
+class EditTest extends \PHPUnit\Framework\TestCase
 {
     /**
-     * @var \Magento\Customer\Helper\AccountManagement
+     * @var ScopeConfigInterface
      */
     protected $scopeConfigMock;
 
@@ -28,22 +29,12 @@ class EditTest extends \PHPUnit_Framework_TestCase
      */
     public function setUp()
     {
-        $this->scopeConfigMock =  $this->getMock(
-            '\Magento\Customer\Helper\AccountManagement',
-            ['getValue'],
-            [],
-            '',
-            false
-        );
+        $this->scopeConfigMock =  $this->getMockBuilder(ScopeConfigInterface::class)
+            ->disableOriginalConstructor()
+            ->getMock();
 
         /** @var \Magento\Framework\View\Element\Template\Context | \PHPUnit_Framework_MockObject_MockObject $context */
-        $context = $this->getMock(
-            'Magento\Framework\View\Element\Template\Context',
-            [],
-            [],
-            '',
-            false
-        );
+        $context = $this->createMock(\Magento\Framework\View\Element\Template\Context::class);
         $context->expects($this->any())
             ->method('getScopeConfig')
             ->willReturn($this->scopeConfigMock);
@@ -51,7 +42,7 @@ class EditTest extends \PHPUnit_Framework_TestCase
         $objectManager = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
 
         $this->block = $objectManager->getObject(
-            '\Magento\Customer\Block\Form\Edit',
+            \Magento\Customer\Block\Form\Edit::class,
             ['context' => $context]
         );
     }

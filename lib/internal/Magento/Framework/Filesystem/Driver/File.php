@@ -2,13 +2,14 @@
 /**
  * Origin filesystem driver
  *
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Framework\Filesystem\Driver;
 
 use Magento\Framework\Exception\FileSystemException;
 use Magento\Framework\Filesystem\DriverInterface;
+use Magento\Framework\Filesystem\Glob;
 
 /**
  * Class File
@@ -193,7 +194,7 @@ class File implements DriverInterface
      * @return bool
      * @throws FileSystemException
      */
-    public function createDirectory($path, $permissions)
+    public function createDirectory($path, $permissions = 0777)
     {
         return $this->mkdirRecursive($path, $permissions);
     }
@@ -206,7 +207,7 @@ class File implements DriverInterface
      * @return bool
      * @throws FileSystemException
      */
-    private function mkdirRecursive($path, $permissions)
+    private function mkdirRecursive($path, $permissions = 0777)
     {
         $path = $this->getScheme() . $path;
         if (is_dir($path)) {
@@ -268,7 +269,7 @@ class File implements DriverInterface
     {
         clearstatcache();
         $globPattern = rtrim($path, '/') . '/' . ltrim($pattern, '/');
-        $result = @glob($globPattern, GLOB_BRACE);
+        $result = Glob::glob($globPattern, Glob::GLOB_BRACE);
         return is_array($result) ? $result : [];
     }
 
@@ -296,7 +297,7 @@ class File implements DriverInterface
         if (!$result) {
             throw new FileSystemException(
                 new \Magento\Framework\Phrase(
-                    'The "%1" path cannot be renamed into "%2" %3',
+                    'The path "%1" cannot be renamed into "%2" %3',
                     [$oldPath, $newPath, $this->getWarningMessage()]
                 )
             );
@@ -527,7 +528,7 @@ class File implements DriverInterface
     public function filePutContents($path, $content, $mode = null)
     {
         $result = @file_put_contents($this->getScheme() . $path, $content, $mode);
-        if (!$result) {
+        if ($result === false) {
             throw new FileSystemException(
                 new \Magento\Framework\Phrase(
                     'The specified "%1" file could not be written %2',
@@ -842,6 +843,13 @@ class File implements DriverInterface
      */
     public function getAbsolutePath($basePath, $path, $scheme = null)
     {
+        // check if the path given is already an absolute path containing the
+        // basepath. so if the basepath starts at position 0 in the path, we
+        // must not concatinate them again because path is already absolute.
+        if (0 === strpos($path, $basePath)) {
+            return $this->getScheme($scheme) . $path;
+        }
+
         return $this->getScheme($scheme) . $basePath . ltrim($this->fixSeparator($path), '/');
     }
 
@@ -935,6 +943,13 @@ class File implements DriverInterface
         if (strpos($path, DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR) === false) {
             return $path;
         }
+
+        //Removing redundant directory separators.
+        $path = preg_replace(
+            '/\\' . DIRECTORY_SEPARATOR . '\\' . DIRECTORY_SEPARATOR . '+/',
+            DIRECTORY_SEPARATOR,
+            $path
+        );
         $pathParts = explode(DIRECTORY_SEPARATOR, $path);
         $realPath = [];
         foreach ($pathParts as $pathPart) {

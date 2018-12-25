@@ -1,18 +1,16 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Downloadable\Controller\Adminhtml\Product\Initialization\Helper\Plugin;
 
-use Magento\Downloadable\Api\Data\SampleInterfaceFactory as SampleFactory;
-use Magento\Downloadable\Api\Data\LinkInterfaceFactory as LinkFactory;
 use Magento\Framework\App\RequestInterface;
-use Magento\Framework\Json\Helper\Data as JsonHelper;
+use Magento\Downloadable\Model\Link\Builder as LinkBuilder;
+use Magento\Downloadable\Model\Sample\Builder as SampleBuilder;
+use Magento\Downloadable\Api\Data\SampleInterfaceFactory;
+use Magento\Downloadable\Api\Data\LinkInterfaceFactory;
 
-/**
- * Class Downloadable
- */
 class Downloadable
 {
     /**
@@ -21,36 +19,46 @@ class Downloadable
     protected $request;
 
     /**
-     * @var SampleFactory
+     * @var SampleInterfaceFactory
      */
-    protected $sampleFactory;
+    private $sampleFactory;
 
     /**
-     * @var LinkFactory
+     * @var LinkInterfaceFactory
      */
-    protected $linkFactory;
+    private $linkFactory;
 
     /**
-     * @var JsonHelper
+     * @var SampleBuilder
      */
-    protected $jsonHelper;
+    private $sampleBuilder;
 
     /**
+     * @var LinkBuilder
+     */
+    private $linkBuilder;
+
+    /**
+     * Constructor
+     *
      * @param RequestInterface $request
-     * @param SampleFactory $sampleFactory
-     * @param LinkFactory $linkFactory
-     * @param JsonHelper $jsonHelper
+     * @param LinkBuilder $linkBuilder
+     * @param SampleBuilder $sampleBuilder
+     * @param SampleInterfaceFactory $sampleFactory
+     * @param LinkInterfaceFactory $linkFactory
      */
     public function __construct(
         RequestInterface $request,
-        SampleFactory $sampleFactory,
-        LinkFactory $linkFactory,
-        JsonHelper $jsonHelper
+        LinkBuilder $linkBuilder,
+        SampleBuilder $sampleBuilder,
+        SampleInterfaceFactory $sampleFactory,
+        LinkInterfaceFactory $linkFactory
     ) {
         $this->request = $request;
-        $this->linkFactory = $linkFactory;
+        $this->linkBuilder = $linkBuilder;
+        $this->sampleBuilder = $sampleBuilder;
         $this->sampleFactory = $sampleFactory;
-        $this->jsonHelper = $jsonHelper;
+        $this->linkFactory = $linkFactory;
     }
 
     /**
@@ -58,7 +66,6 @@ class Downloadable
      *
      * @param \Magento\Catalog\Controller\Adminhtml\Product\Initialization\Helper $subject
      * @param \Magento\Catalog\Model\Product $product
-     *
      * @return \Magento\Catalog\Model\Product
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
@@ -74,47 +81,14 @@ class Downloadable
             if (isset($downloadable['link']) && is_array($downloadable['link'])) {
                 $links = [];
                 foreach ($downloadable['link'] as $linkData) {
-                    if (!$linkData || (isset($linkData['is_delete']) && (bool)$linkData['is_delete'])) {
+                    if (!$linkData || (isset($linkData['is_delete']) && $linkData['is_delete'])) {
                         continue;
                     } else {
-                        unset($linkData['link_id']);
-                        // TODO: need to implement setLinkFileContent()
-                        $link = $this->linkFactory->create(['data' => $linkData]);
-                        if (isset($linkData['type'])) {
-                            $link->setLinkType($linkData['type']);
-                        }
-                        if (isset($linkData['file'])) {
-                            $link->setFile($this->jsonHelper->jsonEncode($linkData['file']));
-                        }
-                        if (isset($linkData['file_content'])) {
-                            $link->setLinkFileContent($linkData['file_content']);
-                        }
-                        $link->setId(null);
-                        if (isset($linkData['sample']['type'])) {
-                            $link->setSampleType($linkData['sample']['type']);
-                        }
-                        if (isset($linkData['sample']['file'])) {
-                            $link->setSampleFileData($this->jsonHelper->jsonEncode($linkData['sample']['file']));
-                        }
-                        if (isset($linkData['sample']['url'])) {
-                            $link->setSampleUrl($linkData['sample']['url']);
-                        }
-                        if (isset($linkData['sample']['file_content'])) {
-                            $link->setSampleFileContent($linkData['file_content']);
-                        }
-                        $link->setStoreId($product->getStoreId());
-                        $link->setWebsiteId($product->getStore()->getWebsiteId());
-                        $link->setProductWebsiteIds($product->getWebsiteIds());
-                        if (!$link->getSortOrder()) {
-                            $link->setSortOrder(1);
-                        }
-                        if (null === $link->getPrice()) {
-                            $link->setPrice(0);
-                        }
-                        if ($link->getIsUnlimited()) {
-                            $link->setNumberOfDownloads(0);
-                        }
-                        $links[] = $link;
+                        $links[] = $this->linkBuilder->setData(
+                            $linkData
+                        )->build(
+                            $this->linkFactory->create()
+                        );
                     }
                 }
                 $extension->setDownloadableProductLinks($links);
@@ -125,23 +99,11 @@ class Downloadable
                     if (!$sampleData || (isset($sampleData['is_delete']) && (bool)$sampleData['is_delete'])) {
                         continue;
                     } else {
-                        unset($sampleData['sample_id']);
-                        $sample = $this->sampleFactory->create(['data' => $sampleData]);
-                        $sample->setId(null);
-                        $sample->setStoreId($product->getStoreId());
-                        if (isset($sampleData['type'])) {
-                            $sample->setSampleType($sampleData['type']);
-                        }
-                        if (isset($sampleData['file'])) {
-                            $sample->setFile($this->jsonHelper->jsonEncode($sampleData['file']));
-                        }
-                        if (isset($sampleData['sample_url'])) {
-                            $sample->setSampleUrl($sampleData['sample_url']);
-                        }
-                        if (!$sample->getSortOrder()) {
-                            $sample->setSortOrder(1);
-                        }
-                        $samples[] = $sample;
+                        $samples[] = $this->sampleBuilder->setData(
+                            $sampleData
+                        )->build(
+                            $this->sampleFactory->create()
+                        );
                     }
                 }
                 $extension->setDownloadableProductSamples($samples);

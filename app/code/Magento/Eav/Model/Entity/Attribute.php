@@ -1,20 +1,23 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Eav\Model\Entity;
 
-use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Api\AttributeValueFactory;
+use Magento\Framework\Exception\LocalizedException;
+use Magento\Framework\Stdlib\DateTime;
 use Magento\Framework\Stdlib\DateTime\DateTimeFormatterInterface;
 
 /**
  * EAV Entity attribute model
  *
+ * @api
  * @method \Magento\Eav\Model\Entity\Attribute setOption($value)
  * @method \Magento\Eav\Api\Data\AttributeExtensionInterface getExtensionAttributes()
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
 class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute implements
     \Magento\Framework\DataObject\IdentityInterface
@@ -23,6 +26,11 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
      * Attribute code max length
      */
     const ATTRIBUTE_CODE_MAX_LENGTH = 30;
+
+    /**
+     * Attribute code min length.
+     */
+    const ATTRIBUTE_CODE_MIN_LENGTH = 1;
 
     /**
      * Cache tag
@@ -146,16 +154,16 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
     {
         switch ($this->getAttributeCode()) {
             case 'created_at':
-                return 'Magento\Eav\Model\Entity\Attribute\Backend\Time\Created';
+                return \Magento\Eav\Model\Entity\Attribute\Backend\Time\Created::class;
 
             case 'updated_at':
-                return 'Magento\Eav\Model\Entity\Attribute\Backend\Time\Updated';
+                return \Magento\Eav\Model\Entity\Attribute\Backend\Time\Updated::class;
 
             case 'store_id':
-                return 'Magento\Eav\Model\Entity\Attribute\Backend\Store';
+                return \Magento\Eav\Model\Entity\Attribute\Backend\Store::class;
 
             case 'increment_id':
-                return 'Magento\Eav\Model\Entity\Attribute\Backend\Increment';
+                return \Magento\Eav\Model\Entity\Attribute\Backend\Increment::class;
 
             default:
                 break;
@@ -172,7 +180,7 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
     protected function _getDefaultSourceModel()
     {
         if ($this->getAttributeCode() == 'store_id') {
-            return 'Magento\Eav\Model\Entity\Attribute\Source\Store';
+            return \Magento\Eav\Model\Entity\Attribute\Source\Store::class;
         }
         return parent::_getDefaultSourceModel();
     }
@@ -260,21 +268,19 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
 
         if ($this->getBackendType() == 'datetime') {
             if (!$this->getBackendModel()) {
-                $this->setBackendModel('Magento\Eav\Model\Entity\Attribute\Backend\Datetime');
+                $this->setBackendModel(\Magento\Eav\Model\Entity\Attribute\Backend\Datetime::class);
             }
 
             if (!$this->getFrontendModel()) {
-                $this->setFrontendModel('Magento\Eav\Model\Entity\Attribute\Frontend\Datetime');
+                $this->setFrontendModel(\Magento\Eav\Model\Entity\Attribute\Frontend\Datetime::class);
             }
 
             // save default date value as timestamp
             if ($hasDefaultValue) {
-                $format = $this->_localeDate->getDateFormat(
-                    \IntlDateFormatter::SHORT
-                );
                 try {
-                    $defaultValue = $this->dateTimeFormatter->formatObject(new \DateTime($defaultValue), $format);
-                    $this->setDefaultValue($defaultValue);
+                    $locale = $this->_localeResolver->getLocale();
+                    $defaultValue = $this->_localeDate->date($defaultValue, $locale, false, false);
+                    $this->setDefaultValue($defaultValue->format(DateTime::DATETIME_PHP_FORMAT));
                 } catch (\Exception $e) {
                     throw new LocalizedException(__('Invalid default date'));
                 }
@@ -283,7 +289,7 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
 
         if ($this->getBackendType() == 'gallery') {
             if (!$this->getBackendModel()) {
-                $this->setBackendModel('Magento\Eav\Model\Entity\Attribute\Backend\DefaultBackend');
+                $this->setBackendModel(\Magento\Eav\Model\Entity\Attribute\Backend\DefaultBackend::class);
             }
         }
 
@@ -299,6 +305,15 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
     {
         $this->_getResource()->saveInSetIncluding($this);
         return parent::afterSave();
+    }
+
+    /**
+     * @return $this
+     * @since 100.0.7
+     */
+    public function afterDelete()
+    {
+        return parent::afterDelete();
     }
 
     /**
@@ -462,5 +477,32 @@ class Attribute extends \Magento\Eav\Model\Entity\Attribute\AbstractAttribute im
     public function getIdentities()
     {
         return [self::CACHE_TAG . '_' . $this->getId()];
+    }
+
+    /**
+     * @inheritdoc
+     * @since 100.0.7
+     */
+    public function __sleep()
+    {
+        $this->unsetData('attribute_set_info');
+        return array_diff(
+            parent::__sleep(),
+            ['_localeDate', '_localeResolver', 'reservedAttributeList', 'dateTimeFormatter']
+        );
+    }
+
+    /**
+     * @inheritdoc
+     * @since 100.0.7
+     */
+    public function __wakeup()
+    {
+        parent::__wakeup();
+        $objectManager = \Magento\Framework\App\ObjectManager::getInstance();
+        $this->_localeDate = $objectManager->get(\Magento\Framework\Stdlib\DateTime\TimezoneInterface::class);
+        $this->_localeResolver = $objectManager->get(\Magento\Framework\Locale\ResolverInterface::class);
+        $this->reservedAttributeList = $objectManager->get(\Magento\Catalog\Model\Product\ReservedAttributeList::class);
+        $this->dateTimeFormatter = $objectManager->get(DateTimeFormatterInterface::class);
     }
 }

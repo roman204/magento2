@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -17,6 +17,9 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Class XmlCatalogGenerateCommand Generates dictionary of URNs for the IDE
  *
  * @SuppressWarnings(PMD.CouplingBetweenObjects)
+ *
+ * @api
+ * @since 100.0.2
  */
 class XmlCatalogGenerateCommand extends Command
 {
@@ -160,6 +163,7 @@ class XmlCatalogGenerateCommand extends Command
      */
     private function getFormatters($format)
     {
+        $format = strtolower($format);
         if (!isset($this->formats[$format])) {
             return false;
         }

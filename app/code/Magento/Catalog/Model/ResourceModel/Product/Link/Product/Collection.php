@@ -1,19 +1,17 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\ResourceModel\Product\Link\Product;
 
-use Magento\Catalog\Api\Data\ProductInterface;
-use Magento\Customer\Api\GroupManagementInterface;
-use Magento\Framework\Model\Entity\MetadataPool;
-
 /**
  * Catalog product linked products collection
  *
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
 class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
 {
@@ -51,87 +49,6 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
      * @var bool
      */
     protected $_hasLinkFilter = false;
-
-    /**
-     * @var MetadataPool
-     */
-    protected $metadataPool;
-
-    /**
-     * @param \Magento\Framework\Data\Collection\EntityFactory $entityFactory
-     * @param \Psr\Log\LoggerInterface $logger
-     * @param \Magento\Framework\Data\Collection\Db\FetchStrategyInterface $fetchStrategy
-     * @param \Magento\Framework\Event\ManagerInterface $eventManager
-     * @param \Magento\Eav\Model\Config $eavConfig
-     * @param \Magento\Framework\App\ResourceConnection $resource
-     * @param \Magento\Eav\Model\EntityFactory $eavEntityFactory
-     * @param \Magento\Catalog\Model\ResourceModel\Helper $resourceHelper
-     * @param \Magento\Framework\Validator\UniversalFactory $universalFactory
-     * @param \Magento\Store\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Framework\Module\Manager $moduleManager
-     * @param \Magento\Catalog\Model\Indexer\Product\Flat\State $catalogProductFlatState
-     * @param \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig
-     * @param \Magento\Catalog\Model\Product\OptionFactory $productOptionFactory
-     * @param \Magento\Catalog\Model\ResourceModel\Url $catalogUrl
-     * @param \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate
-     * @param \Magento\Customer\Model\Session $customerSession
-     * @param \Magento\Framework\Stdlib\DateTime $dateTime
-     * @param GroupManagementInterface $groupManagement
-     * @param \Magento\Catalog\Model\ResourceModel\Product\Collection\ProductLimitation $productLimitation
-     * @param MetadataPool $metadataPool
-     * @param \Magento\Framework\DB\Adapter\AdapterInterface|null $connection
-     * @SuppressWarnings(PHPMD.ExcessiveParameterList)
-     */
-    public function __construct(
-        \Magento\Framework\Data\Collection\EntityFactory $entityFactory,
-        \Psr\Log\LoggerInterface $logger,
-        \Magento\Framework\Data\Collection\Db\FetchStrategyInterface $fetchStrategy,
-        \Magento\Framework\Event\ManagerInterface $eventManager,
-        \Magento\Eav\Model\Config $eavConfig,
-        \Magento\Framework\App\ResourceConnection $resource,
-        \Magento\Eav\Model\EntityFactory $eavEntityFactory,
-        \Magento\Catalog\Model\ResourceModel\Helper $resourceHelper,
-        \Magento\Framework\Validator\UniversalFactory $universalFactory,
-        \Magento\Store\Model\StoreManagerInterface $storeManager,
-        \Magento\Framework\Module\Manager $moduleManager,
-        \Magento\Catalog\Model\Indexer\Product\Flat\State $catalogProductFlatState,
-        \Magento\Framework\App\Config\ScopeConfigInterface $scopeConfig,
-        \Magento\Catalog\Model\Product\OptionFactory $productOptionFactory,
-        \Magento\Catalog\Model\ResourceModel\Url $catalogUrl,
-        \Magento\Framework\Stdlib\DateTime\TimezoneInterface $localeDate,
-        \Magento\Customer\Model\Session $customerSession,
-        \Magento\Framework\Stdlib\DateTime $dateTime,
-        GroupManagementInterface $groupManagement,
-        \Magento\Catalog\Model\ResourceModel\Product\Collection\ProductLimitation $productLimitation,
-        MetadataPool $metadataPool,
-        \Magento\Framework\DB\Adapter\AdapterInterface $connection = null
-    ) {
-        $this->metadataPool = $metadataPool;
-        parent::__construct(
-            $entityFactory,
-            $logger,
-            $fetchStrategy,
-            $eventManager,
-            $eavConfig,
-            $resource,
-            $eavEntityFactory,
-            $resourceHelper,
-            $universalFactory,
-            $storeManager,
-            $moduleManager,
-            $catalogProductFlatState,
-            $scopeConfig,
-            $productOptionFactory,
-            $catalogUrl,
-            $localeDate,
-            $customerSession,
-            $dateTime,
-            $groupManagement,
-            $productLimitation,
-            $connection
-        );
-    }
-
 
     /**
      * Declare link model and initialize type attributes join
@@ -225,7 +142,8 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
             if (!is_array($products)) {
                 $products = [$products];
             }
-            $this->getSelect()->where('links.product_id IN (?)', $products);
+            $identifierField = $this->getProductEntityMetadata()->getIdentifierField();
+            $this->getSelect()->where("product_entity_table.$identifierField IN (?)", $products);
             $this->_hasLinkFilter = true;
         }
 
@@ -264,6 +182,7 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
     {
         if ($this->getLinkModel()) {
             $this->_joinLinks();
+            $this->joinProductsToLinks();
         }
         return parent::_beforeLoad();
     }
@@ -283,7 +202,7 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
             $connection->quoteInto('links.link_type_id = ?', $this->_linkTypeId),
         ];
         $joinType = 'join';
-        $linkField = $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField();
+        $linkField = $this->getProductEntityMetadata()->getLinkField();
         if ($this->getProduct() && $this->getProduct()->getId()) {
             $linkFieldId = $this->getProduct()->getData(
                 $linkField
@@ -424,5 +343,24 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
             }
         }
         return $this;
+    }
+
+    /**
+     * Join Product To Links
+     * @return void
+     */
+    private function joinProductsToLinks()
+    {
+        if ($this->_hasLinkFilter) {
+            $metaDataPool = $this->getProductEntityMetadata();
+            $linkField = $metaDataPool->getLinkField();
+            $entityTable = $metaDataPool->getEntityTable();
+            $this->getSelect()
+                ->join(
+                    ['product_entity_table' => $entityTable],
+                    "links.product_id = product_entity_table.$linkField",
+                    []
+                );
+        }
     }
 }

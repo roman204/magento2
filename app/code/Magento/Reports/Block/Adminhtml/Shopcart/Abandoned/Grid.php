@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Reports\Block\Adminhtml\Shopcart\Abandoned;
@@ -67,6 +67,9 @@ class Grid extends \Magento\Reports\Block\Adminhtml\Grid\Shopcart
 
         $this->setCollection($collection);
         parent::_prepareCollection();
+        if ($this->_isExport) {
+            $collection->setPageSize(null);
+        }
         $this->getCollection()->resolveCustomerNames();
         return $this;
     }
@@ -161,7 +164,7 @@ class Grid extends \Magento\Reports\Block\Adminhtml\Grid\Shopcart
                 'currency_code' => $currencyCode,
                 'index' => 'subtotal',
                 'sortable' => false,
-                'renderer' => 'Magento\Reports\Block\Adminhtml\Grid\Column\Renderer\Currency',
+                'renderer' => \Magento\Reports\Block\Adminhtml\Grid\Column\Renderer\Currency::class,
                 'rate' => $this->getRate($currencyCode),
                 'header_css_class' => 'col-subtotal',
                 'column_css_class' => 'col-subtotal'

@@ -1,8 +1,11 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/**
+ * @api
+ */
 define([
     'uiElement',
     'jquery',
@@ -123,12 +126,15 @@ define([
                 return this;
             }
 
+            self.previousParams = params || {};
+
             $.async({
-                component: this.name
+                component: this.name,
+                ctx: '.' + this.contentSelector
             }, function (el) {
                 self.contentEl = $(el);
                 self.startRender = true;
-                params = _.extend(params || {}, self.params);
+                params = _.extend({}, self.params, params || {});
                 request = self.requestData(params, self.renderSettings);
                 request
                     .done(self.onRender)
@@ -233,8 +239,6 @@ define([
         onRender: function (data) {
             this.loading(false);
             this.set('content', data);
-            this.contentEl.children().applyBindings();
-            this.contentEl.trigger('contentUpdated');
             this.isRendered = true;
             this.startRender = false;
         },

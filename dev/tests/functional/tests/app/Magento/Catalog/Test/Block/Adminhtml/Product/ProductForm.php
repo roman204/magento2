@@ -1,26 +1,25 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 namespace Magento\Catalog\Test\Block\Adminhtml\Product;
 
-use Magento\Ui\Test\Block\Adminhtml\FormSections;
 use Magento\Catalog\Test\Block\Adminhtml\Product\Attribute\AttributeForm;
 use Magento\Catalog\Test\Block\Adminhtml\Product\Attribute\CustomAttribute;
+use Magento\Catalog\Test\Block\Adminhtml\Product\Edit\Section\ProductDetails\NewCategoryIds;
 use Magento\Catalog\Test\Fixture\CatalogProductAttribute;
 use Magento\Mtf\Client\Element\SimpleElement;
-use Magento\Catalog\Test\Block\Adminhtml\Product\Edit\Section\Attributes;
-use Magento\Mtf\Client\Element;
 use Magento\Mtf\Client\Locator;
 use Magento\Mtf\Fixture\FixtureInterface;
-use Magento\Mtf\Fixture\InjectableFixture;
-use Magento\Catalog\Test\Fixture\Category;
-use Magento\Catalog\Test\Block\Adminhtml\Product\Edit\Section\Attributes\Search;
+use Magento\Ui\Test\Block\Adminhtml\DataGrid;
+use Magento\Ui\Test\Block\Adminhtml\FormSections;
 
 /**
  * Product form on backend product page.
+ *
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class ProductForm extends FormSections
 {
@@ -32,39 +31,39 @@ class ProductForm extends FormSections
     protected $attribute = './/*[contains(@class,"label")]/span[text()="%s"]';
 
     /**
-     * Attribute Search locator the Product page.
+     * Product new from date field on the product form
      *
      * @var string
      */
-    protected $attributeSearch = '#product-attribute-search-container';
+    protected $news_from_date ='[name="product[news_from_date]"]';
+
+    /**
+     * Attributes Search modal locator.
+     *
+     * @var string
+     */
+    protected $attributeSearch = '.product_form_product_form_add_attribute_modal';
 
     /**
      * Custom Section locator.
      *
      * @var string
      */
-    protected $customSection = '.admin__collapsible-title';
+    protected $customSection = '[data-index="%s"] .admin__collapsible-title';
 
     /**
      * Attribute block selector.
      *
      * @var string
      */
-    protected $attributeBlock = '#attribute-%s-container';
+    protected $attributeBlock = '[data-index="%s"]';
 
     /**
-     * Magento loader.
+     * NewCategoryIds block selector.
      *
      * @var string
      */
-    protected $loader = '[data-role="loader"]';
-
-    /**
-     * New attribute form selector.
-     *
-     * @var string
-     */
-    protected $newAttributeForm = '#create_new_attribute';
+    protected $newCategoryModalForm = '.product_form_product_form_create_category_modal';
 
     /**
      * Magento form loader.
@@ -74,6 +73,20 @@ class ProductForm extends FormSections
     protected $spinner = '[data-role="spinner"]';
 
     /**
+     * New Attribute modal locator.
+     *
+     * @var string
+     */
+    protected $newAttributeModal = '.product_form_product_form_add_attribute_modal_create_new_attribute_modal';
+
+    /**
+     * Website checkbox xpath selector.
+     *
+     * @var string
+     */
+    protected $websiteCheckbox = '//label[text()="%s"]/../input';
+
+    /**
      * Fill the product form.
      *
      * @param FixtureInterface $product
@@ -81,8 +94,6 @@ class ProductForm extends FormSections
      * @param FixtureInterface|null $category
      * @return $this
      * @throws \Exception
-     *
-     * @SuppressWarnings(PHPMD.NPathComplexity)
      */
     public function fill(FixtureInterface $product, SimpleElement $element = null, FixtureInterface $category = null)
     {
@@ -99,37 +110,28 @@ class ProductForm extends FormSections
             $this->callRender($typeId, 'fill', $renderArguments);
         } else {
             $sections = $this->getFixtureFieldsByContainers($product);
-
-            if ($category) {
-                $sections['product-details']['category_ids']['value'] = $category->getName();
+            if ($product->hasData('category_ids') || $category) {
+                $sections['product-details']['category_ids']['value'] = [];
+                $categories = $product->hasData('category_ids')
+                    ? $product->getDataFieldConfig('category_ids')['source']->getCategories()
+                    : [$category];
+                foreach ($categories as $category) {
+                    if ((int)$category->getId()) {
+                        $sections['product-details']['category_ids']['value'][] = $category->getName();
+                    } else {
+                        $this->getNewCategoryModalForm()->addNewCategory($category);
+                    }
+                }
+                if (empty($sections['product-details']['category_ids']['value'])) {
+                    // We need to clear 'category_ids' key in case of category(es) absence in Product Fixture
+                    // to avoid force clear related form input on edit product page
+                    unset($sections['product-details']['category_ids']);
+                }
             }
             $this->fillContainers($sections, $element);
-
-            if ($product->hasData('custom_attribute')) {
-                $this->createCustomAttribute($product);
-            }
         }
 
         return $this;
-    }
-
-    /**
-     * Create custom attribute.
-     *
-     * @param InjectableFixture $product
-     * @param string $tabName
-     * @return void
-     */
-    protected function createCustomAttribute(InjectableFixture $product, $tabName = 'product-details')
-    {
-        $attribute = $product->getDataFieldConfig('custom_attribute')['source']->getAttribute();
-        $this->openSection('product-details');
-        if (!$this->checkAttributeLabel($attribute)) {
-            /** @var \Magento\Catalog\Test\Block\Adminhtml\Product\Edit\Section\ProductDetails $section */
-            $section = $this->openSection($tabName);
-            $section->addNewAttribute($tabName);
-            $this->getAttributeForm()->fill($attribute);
-        }
     }
 
     /**
@@ -143,10 +145,22 @@ class ProductForm extends FormSections
         $sectionElement = $this->getContainerElement($sectionName);
         if ($sectionElement->getAttribute('type') == 'button') {
             $sectionElement->click();
+            sleep(2); // according to animation timeout in JS
         } else {
             parent::openSection($sectionName);
         }
         return $this;
+    }
+
+    /**
+     * Unassign product from website by website name.
+     *
+     * @param string $name
+     */
+    public function unassignFromWebsite($name)
+    {
+        $this->openSection('websites');
+        $this->_rootElement->find(sprintf($this->websiteCheckbox, $name), Locator::SELECTOR_XPATH)->click();
     }
 
     /**
@@ -176,28 +190,15 @@ class ProductForm extends FormSections
     }
 
     /**
-     * Call method that checking present attribute in search result.
+     * Get attributes search grid.
      *
-     * @param CatalogProductAttribute $productAttribute
-     * @return bool
+     * @return DataGrid
      */
-    public function checkAttributeInSearchAttributeForm(CatalogProductAttribute $productAttribute)
+    public function getAttributesSearchGrid()
     {
-        $this->waitPageToLoad();
-        return $this->getAttributesSearchForm()->isExistAttributeInSearchResult($productAttribute);
-    }
-
-    /**
-     * Get attributes search form.
-     *
-     * @return Search
-     */
-    protected function getAttributesSearchForm()
-    {
-        return $this->_rootElement->find(
-            $this->attributeSearch,
-            Locator::SELECTOR_CSS,
-            'Magento\Catalog\Test\Block\Adminhtml\Product\Edit\Section\Attributes\Search'
+        return $this->blockFactory->create(
+            \Magento\Catalog\Test\Block\Adminhtml\Product\Edit\Section\Attributes\Grid::class,
+            ['element' => $this->browser->find($this->attributeSearch)]
         );
     }
 
@@ -210,8 +211,7 @@ class ProductForm extends FormSections
     public function isCustomSectionVisible($sectionName)
     {
         $sectionName = strtolower($sectionName);
-        $selector = sprintf($this->customSection, $sectionName);
-        $this->waitForElementVisible($selector);
+        $selector = sprintf($this->attributeBlock, $sectionName);
 
         return $this->_rootElement->find($selector)->isVisible();
     }
@@ -229,31 +229,6 @@ class ProductForm extends FormSections
     }
 
     /**
-     * Click "Save" button on attribute form.
-     *
-     * @return void
-     */
-    public function saveAttributeForm()
-    {
-        $this->getAttributeForm()->saveAttributeForm();
-
-        $browser = $this->browser;
-        $element = $this->newAttributeForm;
-        $loader = $this->loader;
-        $this->_rootElement->waitUntil(
-            function () use ($browser, $element) {
-                return $browser->find($element)->isVisible() == false ? true : null;
-            }
-        );
-
-        $this->_rootElement->waitUntil(
-            function () use ($browser, $loader) {
-                return $browser->find($loader)->isVisible() == false ? true : null;
-            }
-        );
-    }
-
-    /**
      * Get Attribute Form.
      *
      * @return AttributeForm
@@ -261,8 +236,21 @@ class ProductForm extends FormSections
     public function getAttributeForm()
     {
         return $this->blockFactory->create(
-            'Magento\Catalog\Test\Block\Adminhtml\Product\Attribute\AttributeForm',
-            ['element' => $this->browser->find('body')]
+            \Magento\Catalog\Test\Block\Adminhtml\Product\Attribute\AttributeForm::class,
+            ['element' => $this->browser->find($this->newAttributeModal)]
+        );
+    }
+
+    /**
+     * Get New Category Modal Form.
+     *
+     * @return NewCategoryIds
+     */
+    public function getNewCategoryModalForm()
+    {
+        return $this->blockFactory->create(
+            \Magento\Catalog\Test\Block\Adminhtml\Product\Edit\Section\ProductDetails\NewCategoryIds::class,
+            ['element' => $this->browser->find($this->newCategoryModalForm)]
         );
     }
 
@@ -277,26 +265,17 @@ class ProductForm extends FormSections
         return $this->_rootElement->find(
             sprintf($this->attributeBlock, $attribute->getAttributeCode()),
             Locator::SELECTOR_CSS,
-            'Magento\Catalog\Test\Block\Adminhtml\Product\Attribute\CustomAttribute'
+            \Magento\Catalog\Test\Block\Adminhtml\Product\Attribute\CustomAttribute::class
         );
     }
 
     /**
-     * Click "Add Attribute" button from specific section.
-     *
-     * @param string $sectionName
-     * @throws \Exception
+     * @param $sectionName
+     * @return bool
      */
-    public function addNewAttribute($sectionName = 'product-details')
+    public function isProductNewFromDateVisible($sectionName)
     {
-        $section = $this->getSection($sectionName);
-        if ($section instanceof Attributes) {
-            $this->openSection($sectionName);
-            $section->addNewAttribute($sectionName);
-        } else {
-            throw new \Exception(
-                "$sectionName hasn't 'Add attribute' button or is not instance of ProductSection class."
-            );
-        }
+        $this->openSection($sectionName);
+        return $this->_rootElement->find($this->news_from_date, Locator::SELECTOR_CSS)->isVisible();
     }
 }

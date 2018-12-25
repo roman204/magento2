@@ -1,44 +1,27 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Vault\Test\Unit\Model;
 
 use Magento\Customer\Model\Session;
-use Magento\Store\Api\Data\StoreInterface;
-use Magento\Store\Model\StoreManagerInterface;
 use Magento\Vault\Api\Data\PaymentTokenInterface;
 use Magento\Vault\Model\CustomerTokenManagement;
 use Magento\Vault\Model\PaymentTokenManagement;
-use Magento\Vault\Model\VaultPaymentInterface;
+use PHPUnit_Framework_MockObject_MockObject as MockObject;
 
-class CustomerTokenManagementTest extends \PHPUnit_Framework_TestCase
+class CustomerTokenManagementTest extends \PHPUnit\Framework\TestCase
 {
     /**
-     * @var PaymentTokenManagement|\PHPUnit_Framework_MockObject_MockObject
+     * @var PaymentTokenManagement|MockObject
      */
-    private $paymentTokenManagementMock;
+    private $paymentTokenManagement;
 
     /**
-     * @var Session|\PHPUnit_Framework_MockObject_MockObject
+     * @var Session|MockObject
      */
-    private $customerSessionMock;
-
-    /**
-     * @var VaultPaymentInterface|\PHPUnit_Framework_MockObject_MockObject
-     */
-    private $vaultPayment;
-
-    /**
-     * @var StoreManagerInterface|\PHPUnit_Framework_MockObject_MockObject
-     */
-    private $storeManager;
-
-    /**
-     * @var StoreInterface|\PHPUnit_Framework_MockObject_MockObject
-     */
-    private $store;
+    private $customerSession;
 
     /**
      * @var CustomerTokenManagement
@@ -47,93 +30,72 @@ class CustomerTokenManagementTest extends \PHPUnit_Framework_TestCase
 
     protected function setUp()
     {
-        $this->paymentTokenManagementMock = $this->getMockBuilder(PaymentTokenManagement::class)
+        $this->paymentTokenManagement = $this->getMockBuilder(PaymentTokenManagement::class)
             ->disableOriginalConstructor()
             ->getMock();
-        $this->customerSessionMock = $this->getMockBuilder(Session::class)
+        $this->customerSession = $this->getMockBuilder(Session::class)
             ->disableOriginalConstructor()
             ->getMock();
-        $this->vaultPayment = $this->getMock(VaultPaymentInterface::class);
-        $this->storeManager = $this->getMock(StoreManagerInterface::class);
-        $this->store = $this->getMock(StoreInterface::class);
 
         $this->tokenManagement = new CustomerTokenManagement(
-            $this->vaultPayment,
-            $this->paymentTokenManagementMock,
-            $this->customerSessionMock,
-            $this->storeManager
+            $this->paymentTokenManagement,
+            $this->customerSession
         );
     }
 
-    public function testGetCustomerSessionTokensNonRegisteredCustomer()
+    /**
+     * @param int|null $customerId
+     * @param bool $isLoggedCustomer
+     * @return void
+     * @dataProvider getCustomerSessionTokensNegativeDataProvider
+     */
+    public function testGetCustomerSessionTokensNegative($customerId, bool $isLoggedCustomer)
     {
-        $this->customerSessionMock->expects(self::once())
-            ->method('getCustomerId')
-            ->willReturn(null);
-
-        $this->paymentTokenManagementMock->expects(static::never())
-            ->method('getVisibleAvailableTokens');
-
-        $this->tokenManagement->getCustomerSessionTokens();
-    }
-
-    public function testGetCustomerSessionTokensNoActiveVaultProvider()
-    {
-        $customerId = 1;
-        $storeId = 1;
-        $this->customerSessionMock->expects(self::once())
-            ->method('getCustomerId')
+        $this->customerSession->method('getCustomerId')
             ->willReturn($customerId);
 
-        $this->storeManager->expects(static::once())
-            ->method('getStore')
-            ->with(null)
-            ->willReturn($this->store);
-        $this->store->expects(static::once())
-            ->method('getId')
-            ->willReturn($storeId);
-        $this->vaultPayment->expects(static::once())
-            ->method('isActive')
-            ->with($storeId)
-            ->willReturn(false);
+        $this->customerSession->method('isLoggedIn')
+            ->willReturn($isLoggedCustomer);
 
-        $this->paymentTokenManagementMock->expects(static::never())
+        $this->paymentTokenManagement->expects(static::never())
             ->method('getVisibleAvailableTokens');
 
         $this->tokenManagement->getCustomerSessionTokens();
+
+        static::assertEquals(
+            [],
+            $this->tokenManagement->getCustomerSessionTokens()
+        );
+    }
+
+    /**
+     * @return array
+     */
+    public function getCustomerSessionTokensNegativeDataProvider()
+    {
+        return [
+            'not registered customer' => [null, false],
+            'not logged in customer' => [1, false],
+        ];
     }
 
     public function testGetCustomerSessionTokens()
     {
         $customerId = 1;
-        $providerCode = 'vault_provider';
-        $storeId = 1;
-        $token = $this->getMock(PaymentTokenInterface::class);
+        $token = $this->createMock(PaymentTokenInterface::class);
         $expectation = [$token];
 
-        $this->customerSessionMock->expects(self::once())
+        $this->customerSession->expects(static::once())
             ->method('getCustomerId')
             ->willReturn($customerId);
 
-        $this->storeManager->expects(static::once())
-            ->method('getStore')
-            ->with(null)
-            ->willReturn($this->store);
-        $this->store->expects(static::once())
-            ->method('getId')
-            ->willReturn($storeId);
-        $this->vaultPayment->expects(static::once())
-            ->method('isActive')
-            ->with($storeId)
+        $this->customerSession->expects(static::once())
+            ->method('isLoggedIn')
             ->willReturn(true);
-        $this->vaultPayment->expects(static::once())
-            ->method('getProviderCode')
-            ->with($storeId)
-            ->willReturn($providerCode);
 
-        $this->paymentTokenManagementMock->expects(static::once())
+        $this->paymentTokenManagement->expects(static::once())
             ->method('getVisibleAvailableTokens')
-            ->with($customerId, $providerCode)
+            ->with($customerId)
             ->willReturn($expectation);
 
         static::assertEquals(

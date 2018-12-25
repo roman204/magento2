@@ -1,12 +1,13 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Controller\Adminhtml\Index;
 
 use Magento\Customer\Api\AccountManagementInterface;
 use Magento\Customer\Api\AddressRepositoryInterface;
+use Magento\Customer\Api\CustomerMetadataInterface;
 use Magento\Customer\Api\CustomerRepositoryInterface;
 use Magento\Customer\Api\Data\AddressInterfaceFactory;
 use Magento\Customer\Api\Data\CustomerInterfaceFactory;
@@ -124,37 +125,25 @@ class Viewfile extends \Magento\Customer\Controller\Adminhtml\Index
     /**
      * Customer view file action
      *
-     * @return void
+     * @return \Magento\Framework\Controller\ResultInterface|void
      * @throws NotFoundException
      *
      * @SuppressWarnings(PHPMD.ExitExpression)
      */
     public function execute()
     {
-        $file = null;
-        $plain = false;
-        if ($this->getRequest()->getParam('file')) {
-            // download file
-            $file = $this->urlDecoder->decode(
-                $this->getRequest()->getParam('file')
-            );
-        } elseif ($this->getRequest()->getParam('image')) {
-            // show plain image
-            $file = $this->urlDecoder->decode(
-                $this->getRequest()->getParam('image')
-            );
-            $plain = true;
-        } else {
-            throw new NotFoundException(__('Page not found.'));
-        }
+        list($file, $plain) = $this->getFileParams();
 
         /** @var \Magento\Framework\Filesystem $filesystem */
-        $filesystem = $this->_objectManager->get('Magento\Framework\Filesystem');
+        $filesystem = $this->_objectManager->get(\Magento\Framework\Filesystem::class);
         $directory = $filesystem->getDirectoryRead(DirectoryList::MEDIA);
-        $fileName = 'customer' . '/' . ltrim($file, '/');
+        $fileName = CustomerMetadataInterface::ENTITY_TYPE_CUSTOMER . '/' . ltrim($file, '/');
         $path = $directory->getAbsolutePath($fileName);
-        if (!$directory->isFile($fileName)
-            && !$this->_objectManager->get('Magento\MediaStorage\Helper\File\Storage')->processStorageFile($path)
+        if (mb_strpos($path, '..') !== false
+            || (!$directory->isFile($fileName)
+                && !$this->_objectManager->get(
+                    \Magento\MediaStorage\Helper\File\Storage::class
+                )->processStorageFile($path))
         ) {
             throw new NotFoundException(__('Page not found.'));
         }
@@ -175,7 +164,7 @@ class Viewfile extends \Magento\Customer\Controller\Adminhtml\Index
                     $contentType = 'application/octet-stream';
                     break;
             }
-            $stat = $directory->stat($path);
+            $stat = $directory->stat($fileName);
             $contentLength = $stat['size'];
             $contentModify = $stat['mtime'];
 
@@ -195,6 +184,33 @@ class Viewfile extends \Magento\Customer\Controller\Adminhtml\Index
                 ['type' => 'filename', 'value' => $fileName],
                 DirectoryList::MEDIA
             );
+        }
+    }
+
+    /**
+     * Get parameters from request.
+     *
+     * @return array
+     * @throws NotFoundException
+     */
+    private function getFileParams()
+    {
+        if ($this->getRequest()->getParam('file')) {
+            // download file
+            $file = $this->urlDecoder->decode(
+                $this->getRequest()->getParam('file')
+            );
+
+            return [$file, false];
+        } elseif ($this->getRequest()->getParam('image')) {
+            // show plain image
+            $file = $this->urlDecoder->decode(
+                $this->getRequest()->getParam('image')
+            );
+
+            return [$file, true];
+        } else {
+            throw new NotFoundException(__('Page not found.'));
         }
     }
 }

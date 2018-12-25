@@ -1,7 +1,7 @@
 <?php
 /**
  * @api
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -19,7 +19,7 @@ class Template extends Block
      *
      * @var string
      */
-    protected $spinner = '[data-role="spinner"]';
+    protected $spinner = '#container [data-role="spinner"]';
 
     /**
      * Magento loader.
@@ -36,7 +36,7 @@ class Template extends Block
     protected $loaderOld = '#loading-mask #loading_mask_loader';
 
     /**
-     * Wait until loader will be disappeared.
+     * Wait until loader disappears.
      *
      * @return void
      */

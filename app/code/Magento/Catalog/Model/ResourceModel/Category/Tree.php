@@ -1,16 +1,18 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\ResourceModel\Category;
 
 use Magento\Framework\Data\Tree\Dbp;
 use Magento\Catalog\Api\Data\CategoryInterface;
-use Magento\Framework\Model\Entity\MetadataPool;
+use Magento\Framework\EntityManager\MetadataPool;
 
 /**
+ * @api
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
 class Tree extends Dbp
 {
@@ -93,6 +95,7 @@ class Tree extends Dbp
 
     /**
      * @var MetadataPool
+     * @since 101.0.0
      */
     protected $metadataPool;
 
@@ -105,7 +108,6 @@ class Tree extends Dbp
      * @param \Magento\Framework\Event\ManagerInterface $eventManager
      * @param \Magento\Catalog\Model\Attribute\Config $attributeConfig
      * @param Collection\Factory $collectionFactory
-     * @param MetadataPool $metadataPool
      */
     public function __construct(
         \Magento\Catalog\Model\ResourceModel\Category $catalogCategory,
@@ -114,8 +116,7 @@ class Tree extends Dbp
         \Magento\Framework\App\ResourceConnection $resource,
         \Magento\Framework\Event\ManagerInterface $eventManager,
         \Magento\Catalog\Model\Attribute\Config $attributeConfig,
-        \Magento\Catalog\Model\ResourceModel\Category\Collection\Factory $collectionFactory,
-        MetadataPool $metadataPool
+        \Magento\Catalog\Model\ResourceModel\Category\Collection\Factory $collectionFactory
     ) {
         $this->_catalogCategory = $catalogCategory;
         $this->_cache = $cache;
@@ -134,7 +135,6 @@ class Tree extends Dbp
         $this->_eventManager = $eventManager;
         $this->_attributeConfig = $attributeConfig;
         $this->_collectionFactory = $collectionFactory;
-        $this->metadataPool = $metadataPool;
     }
 
     /**
@@ -308,7 +308,7 @@ class Tree extends Dbp
      */
     protected function _getInactiveItemIds($collection, $storeId)
     {
-        $linkField = $this->metadataPool->getMetadata(CategoryInterface::class)->getLinkField();
+        $linkField = $this->getMetadataPool()->getMetadata(CategoryInterface::class)->getLinkField();
         $intTable = $this->_coreResource->getTableName('catalog_category_entity_int');
 
         $select = $collection->getAllIdsSql()
@@ -582,7 +582,7 @@ class Tree extends Dbp
      */
     protected function _createCollectionDataSelect($sorted = true, $optionalAttributes = [])
     {
-        $meta = $this->metadataPool->getMetadata(CategoryInterface::class);
+        $meta = $this->getMetadataPool()->getMetadata(CategoryInterface::class);
         $linkField = $meta->getLinkField();
 
         $select = $this->_getDefaultCollection($sorted ? $this->_orderField : false)->getSelect();
@@ -677,5 +677,17 @@ class Tree extends Dbp
         }
         $select = $this->_conn->select()->from($this->_table, ['entity_id'])->where('entity_id IN (?)', $ids);
         return $this->_conn->fetchCol($select);
+    }
+
+    /**
+     * @return \Magento\Framework\EntityManager\MetadataPool
+     */
+    private function getMetadataPool()
+    {
+        if (null === $this->metadataPool) {
+            $this->metadataPool = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\EntityManager\MetadataPool::class);
+        }
+        return $this->metadataPool;
     }
 }

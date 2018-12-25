@@ -1,36 +1,64 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Quote\Test\Unit\Model;
 
-use \Magento\Quote\Model\QuoteValidator;
+use Magento\Directory\Model\AllowedCountries;
+use Magento\Quote\Model\Quote;
+use Magento\Quote\Model\Quote\Address;
+use Magento\Quote\Model\Quote\Payment;
+use Magento\Quote\Model\Quote\Validator\MinimumOrderAmount\ValidationMessage as OrderAmountValidationMessage;
+use Magento\Quote\Model\QuoteValidator;
+use PHPUnit_Framework_MockObject_MockObject as MockObject;
 
 /**
  * Class QuoteValidatorTest
  */
-class QuoteValidatorTest extends \PHPUnit_Framework_TestCase
+class QuoteValidatorTest extends \PHPUnit\Framework\TestCase
 {
+    private static $storeId = 2;
+
     /**
      * @var \Magento\Quote\Model\QuoteValidator
      */
-    protected $quoteValidator;
+    private $quoteValidator;
 
     /**
-     * @var \PHPUnit_Framework_MockObject_MockObject | \Magento\Quote\Model\Quote
+     * @var Quote|MockObject
      */
-    protected $quoteMock;
+    private $quote;
+
+    /**
+     * @var AllowedCountries|MockObject
+     */
+    private $allowedCountryReader;
+
+    /**
+     * @var OrderAmountValidationMessage|MockObject
+     */
+    private $orderAmountValidationMessage;
 
     /**
      * @return void
      */
     protected function setUp()
     {
-        $this->quoteValidator = new \Magento\Quote\Model\QuoteValidator();
+        $this->allowedCountryReader = $this->getMockBuilder(AllowedCountries::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $this->orderAmountValidationMessage = $this->getMockBuilder(OrderAmountValidationMessage::class)
+            ->disableOriginalConstructor()
+            ->getMock();
 
-        $this->quoteMock = $this->getMock(
-            'Magento\Quote\Model\Quote',
+        $this->quoteValidator = new QuoteValidator(
+            $this->allowedCountryReader,
+            $this->orderAmountValidationMessage
+        );
+
+        $this->quote = $this->createPartialMock(
+            Quote::class,
             [
                 'getShippingAddress',
                 'getBillingAddress',
@@ -39,140 +67,29 @@ class QuoteValidatorTest extends \PHPUnit_Framework_TestCase
                 'setHasError',
                 'addMessage',
                 'isVirtual',
-                '__wakeup'
-            ],
-            [],
-            '',
-            false
+                'validateMinimumAmount',
+                'getIsMultiShipping',
+                'getStoreId'
+            ]
         );
+        $this->quote->method('getStoreId')
+            ->willReturn(self::$storeId);
     }
 
     public function testCheckQuoteAmountExistingError()
     {
-        $this->quoteMock->expects($this->once())
-            ->method('getHasError')
-            ->will($this->returnValue(true));
+        $this->quote->method('getHasError')
+            ->willReturn(true);
 
-        $this->quoteMock->expects($this->never())
+        $this->quote->expects(self::never())
             ->method('setHasError');
 
-        $this->quoteMock->expects($this->never())
+        $this->quote->expects(self::never())
             ->method('addMessage');
 
-        $this->assertSame(
+        self::assertSame(
             $this->quoteValidator,
-            $this->quoteValidator->validateQuoteAmount($this->quoteMock, QuoteValidator::MAXIMUM_AVAILABLE_NUMBER + 1)
+            $this->quoteValidator->validateQuoteAmount($this->quote, QuoteValidator::MAXIMUM_AVAILABLE_NUMBER + 1)
         );
-    }
-
-    public function testCheckQuoteAmountAmountLessThanAvailable()
-    {
-        $this->quoteMock->expects($this->once())
-            ->method('getHasError')
-            ->will($this->returnValue(false));
-
-        $this->quoteMock->expects($this->never())
-            ->method('setHasError');
-
-        $this->quoteMock->expects($this->never())
-            ->method('addMessage');
-
-        $this->assertSame(
-            $this->quoteValidator,
-            $this->quoteValidator->validateQuoteAmount($this->quoteMock, QuoteValidator::MAXIMUM_AVAILABLE_NUMBER - 1)
-        );
-    }
-
-    public function testCheckQuoteAmountAmountGreaterThanAvailable()
-    {
-        $this->quoteMock->expects($this->once())
-            ->method('getHasError')
-            ->will($this->returnValue(false));
-
-        $this->quoteMock->expects($this->once())
-            ->method('setHasError')
-            ->with(true);
-
-        $this->quoteMock->expects($this->once())
-            ->method('addMessage')
-            ->with(__('This item price or quantity is not valid for checkout.'));
-
-        $this->assertSame(
-            $this->quoteValidator,
-            $this->quoteValidator->validateQuoteAmount($this->quoteMock, QuoteValidator::MAXIMUM_AVAILABLE_NUMBER + 1)
-        );
-    }
-
-    /**
-     * @expectedException \Magento\Framework\Exception\LocalizedException
-     * @expectedExceptionMessage Please check the shipping address information.
-     */
-    public function testValidateBeforeSubmitThrowsExceptionIfShippingAddressIsInvalid()
-    {
-        $shippingAddressMock = $this->getMock('Magento\Quote\Model\Quote\Address', [], [], '', false);
-        $this->quoteMock->expects($this->any())->method('getShippingAddress')->willReturn($shippingAddressMock);
-        $this->quoteMock->expects($this->any())->method('isVirtual')->willReturn(false);
-        $shippingAddressMock->expects($this->any())->method('validate')->willReturn(['Invalid Shipping Address']);
-
-        $this->quoteValidator->validateBeforeSubmit($this->quoteMock);
-    }
-
-    /**
-     * @expectedException \Magento\Framework\Exception\LocalizedException
-     * @expectedExceptionMessage Please specify a shipping method.
-     */
-    public function testValidateBeforeSubmitThrowsExceptionIfShippingRateIsNotSelected()
-    {
-        $shippingMethod = 'checkmo';
-        $shippingAddressMock = $this->getMock(
-            'Magento\Quote\Model\Quote\Address',
-            [
-                'validate',
-                'getShippingMethod',
-                'getShippingRateByCode',
-                '__wakeup'
-            ],
-            [],
-            '',
-            false
-        );
-        $this->quoteMock->expects($this->any())->method('getShippingAddress')->willReturn($shippingAddressMock);
-        $this->quoteMock->expects($this->any())->method('isVirtual')->willReturn(false);
-        $shippingAddressMock->expects($this->any())->method('validate')->willReturn(true);
-        $shippingAddressMock->expects($this->any())->method('getShippingMethod')->willReturn($shippingMethod);
-        $shippingAddressMock->expects($this->once())->method('getShippingRateByCode')->with($shippingMethod);
-
-        $this->quoteValidator->validateBeforeSubmit($this->quoteMock);
-    }
-
-    /**
-     * @expectedException \Magento\Framework\Exception\LocalizedException
-     * @expectedExceptionMessage Please check the billing address information.
-     */
-    public function testValidateBeforeSubmitThrowsExceptionIfBillingAddressIsNotValid()
-    {
-        $billingAddressMock = $this->getMock('Magento\Quote\Model\Quote\Address', [], [], '', false);
-        $this->quoteMock->expects($this->any())->method('getBillingAddress')->willReturn($billingAddressMock);
-        $this->quoteMock->expects($this->any())->method('isVirtual')->willReturn(true);
-        $billingAddressMock->expects($this->any())->method('validate')->willReturn(['Invalid Billing Address']);
-
-        $this->quoteValidator->validateBeforeSubmit($this->quoteMock);
-    }
-
-    /**
-     * @expectedException \Magento\Framework\Exception\LocalizedException
-     * @expectedExceptionMessage Please select a valid payment method.
-     */
-    public function testValidateBeforeSubmitThrowsExceptionIfPaymentMethodIsNotSelected()
-    {
-        $paymentMock = $this->getMock('Magento\Quote\Model\Quote\Payment', [], [], '', false);
-        $billingAddressMock = $this->getMock('Magento\Quote\Model\Quote\Address', [], [], '', false);
-        $billingAddressMock->expects($this->any())->method('validate')->willReturn(true);
-
-        $this->quoteMock->expects($this->any())->method('getBillingAddress')->willReturn($billingAddressMock);
-        $this->quoteMock->expects($this->any())->method('getPayment')->willReturn($paymentMock);
-        $this->quoteMock->expects($this->any())->method('isVirtual')->willReturn(true);
-
-        $this->quoteValidator->validateBeforeSubmit($this->quoteMock);
     }
 }

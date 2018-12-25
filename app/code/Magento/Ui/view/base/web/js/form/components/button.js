@@ -1,25 +1,31 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/**
+ * @api
+ */
 define([
     'uiElement',
     'uiRegistry',
     'uiLayout',
-    'mageUtils'
-], function (Element, registry, layout, utils) {
+    'mageUtils',
+    'underscore'
+], function (Element, registry, layout, utils, _) {
     'use strict';
 
     return Element.extend({
         defaults: {
+            buttonClasses: {},
             additionalClasses: {},
             displayArea: 'outsideGroup',
             displayAsLink: false,
             elementTmpl: 'ui/form/element/button',
             template: 'ui/form/components/button/simple',
             visible: true,
-            disabled: false
+            disabled: false,
+            title: ''
         },
 
         /**
@@ -29,7 +35,8 @@ define([
          */
         initialize: function () {
             return this._super()
-                ._setClasses();
+                ._setClasses()
+                ._setButtonClasses();
         },
 
         /** @inheritdoc */
@@ -37,7 +44,8 @@ define([
             return this._super()
                 .observe([
                     'visible',
-                    'disabled'
+                    'disabled',
+                    'title'
                 ]);
         },
 
@@ -56,7 +64,7 @@ define([
          */
         applyAction: function (action) {
             var targetName = action.targetName,
-                params = action.params,
+                params = utils.copy(action.params) || [],
                 actionName = action.actionName,
                 target;
 
@@ -66,7 +74,8 @@ define([
             target = registry.async(targetName);
 
             if (target && typeof target === 'function' && actionName) {
-                target(actionName, params);
+                params.unshift(actionName);
+                target.apply(target, params);
             }
         },
 
@@ -97,6 +106,12 @@ define([
          */
         _setClasses: function () {
             if (typeof this.additionalClasses === 'string') {
+                if (this.additionalClasses === '') {
+                    this.additionalClasses = {};
+
+                    return this;
+                }
+
                 this.additionalClasses = this.additionalClasses
                     .trim()
                     .split(' ')
@@ -107,6 +122,36 @@ define([
                     }, {}
                 );
             }
+
+            return this;
+        },
+
+        /**
+         * Extends 'buttonClasses' object.
+         *
+         * @returns {Object} Chainable.
+         */
+        _setButtonClasses: function () {
+            var additional = this.buttonClasses;
+
+            if (_.isString(additional)) {
+                this.buttonClasses = {};
+
+                if (additional.trim().length) {
+                    additional = additional.trim().split(' ');
+
+                    additional.forEach(function (name) {
+                        if (name.length) {
+                            this.buttonClasses[name] = true;
+                        }
+                    }, this);
+                }
+            }
+
+            _.extend(this.buttonClasses, {
+                'action-basic': !this.displayAsLink,
+                'action-additional': this.displayAsLink
+            });
 
             return this;
         }

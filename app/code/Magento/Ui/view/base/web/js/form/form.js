@@ -1,6 +1,10 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
+ */
+
+/**
+ * @api
  */
 define([
     'underscore',
@@ -15,6 +19,12 @@ define([
 ], function (_, loader, resolver, adapter, Collection, utils, $, app) {
     'use strict';
 
+    /**
+     * Format params
+     *
+     * @param {Object} params
+     * @returns {Array}
+     */
     function prepareParams(params) {
         var result = '?';
 
@@ -32,7 +42,8 @@ define([
      * @returns {Object}
      */
     function collectData(items) {
-        var result = {};
+        var result = {},
+            name;
 
         items = Array.prototype.slice.call(items);
 
@@ -48,6 +59,11 @@ define([
                     }
                     break;
 
+                case 'select-multiple':
+                    name = item.name.substring(0, item.name.length - 2); //remove [] from the name ending
+                    result[name] = _.pluck(item.selectedOptions, 'value');
+                    break;
+
                 default:
                     result[item.name] = item.value;
             }
@@ -56,6 +72,14 @@ define([
         return result;
     }
 
+    /**
+     * Makes ajax request
+     *
+     * @param {Object} params
+     * @param {Object} data
+     * @param {String} url
+     * @returns {*}
+     */
     function makeRequest(params, data, url) {
         var save = $.Deferred();
 
@@ -72,6 +96,12 @@ define([
             url: url + prepareParams(params),
             data: data,
             dataType: 'json',
+
+            /**
+             * Success callback.
+             * @param {Object} resp
+             * @returns {Boolean}
+             */
             success: function (resp) {
                 if (resp.ajaxExpired) {
                     window.location.href = resp.ajaxRedirect;
@@ -88,12 +118,21 @@ define([
                     $('body').notification('add', {
                         error: resp.error,
                         message: message,
+
+                        /**
+                         * Inserts message on page
+                         * @param {String} msg
+                         */
                         insertMethod: function (msg) {
                             $('.page-main-actions').after(msg);
                         }
                     });
                 });
             },
+
+            /**
+             * Complete callback.
+             */
             complete: function () {
                 $('body').trigger('processStop');
             }
@@ -124,7 +163,9 @@ define([
         defaults: {
             additionalFields: [],
             additionalInvalid: false,
-            selectorPrefix: false,
+            selectorPrefix: '.page-content',
+            messagesClass: 'messages',
+            errorClass: '.admin__field._error',
             eventPrefix: '.${ $.index }',
             ajaxSave: false,
             ajaxSaveType: 'default',
@@ -134,6 +175,10 @@ define([
             listens: {
                 selectorPrefix: 'destroyAdapter initAdapter',
                 '${ $.name }.${ $.reloadItem }': 'params.set reload'
+            },
+            exports: {
+                selectorPrefix: '${ $.provider }:client.selectorPrefix',
+                messagesClass: '${ $.provider }:client.messagesClass'
             }
         },
 
@@ -218,7 +263,24 @@ define([
             if (!this.additionalInvalid && !this.source.get('params.invalid')) {
                 this.setAdditionalData(data)
                     .submit(redirect);
+            } else {
+                this.focusInvalid();
             }
+        },
+
+        /**
+         * Tries to set focus on first invalid form field.
+         *
+         * @returns {Object}
+         */
+        focusInvalid: function () {
+            var invalidField = _.find(this.delegate('checkInvalid'));
+
+            if (!_.isUndefined(invalidField) && _.isFunction(invalidField.focused)) {
+                invalidField.focused(true);
+            }
+
+            return this;
         },
 
         /**
@@ -286,6 +348,9 @@ define([
             this.source.trigger('data.overload');
         },
 
+        /**
+         * Updates data from server.
+         */
         reload: function () {
             makeRequest(this.params, this.data, this.reloadUrl).then(function (data) {
                 app(data, true);

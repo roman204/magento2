@@ -1,21 +1,26 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Security\Test\Unit\Model;
 
+use Magento\Framework\HTTP\PhpEnvironment\RemoteAddress;
+use Magento\Framework\Stdlib\DateTime\DateTime;
 use Magento\Framework\TestFramework\Unit\Helper\ObjectManager;
+use Magento\Security\Model\ConfigInterface;
+use Magento\Security\Model\SecurityManager;
 
 /**
  * Test class for \Magento\Security\Model\SecurityManager testing
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-class SecurityManagerTest extends \PHPUnit_Framework_TestCase
+class SecurityManagerTest extends \PHPUnit\Framework\TestCase
 {
     /** @var  \Magento\Security\Model\SecurityManager */
     protected $model;
 
-    /** @var \Magento\Security\Helper\SecurityConfig */
+    /** @var ConfigInterface */
     protected $securityConfigMock;
 
     /** @var \Magento\Security\Model\ResourceModel\PasswordResetRequestEvent\CollectionFactory */
@@ -39,6 +44,16 @@ class SecurityManagerTest extends \PHPUnit_Framework_TestCase
     protected $eventManagerMock;
 
     /**
+     * @var DateTime
+     */
+    protected $dateTimeMock;
+
+    /*
+     * @var RemoteAddress
+     */
+    protected $remoteAddressMock;
+
+    /**
      * Init mocks for tests
      * @return void
      */
@@ -46,56 +61,34 @@ class SecurityManagerTest extends \PHPUnit_Framework_TestCase
     {
         $this->objectManager = new ObjectManager($this);
 
-        $this->securityConfigMock = $this->getMock(
-            'Magento\Security\Helper\SecurityConfig',
-            ['getRemoteIp', 'getCurrentTimestamp'],
-            [],
-            '',
-            false
+        $this->securityConfigMock =  $this->getMockBuilder(\Magento\Security\Model\ConfigInterface::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $this->passwordResetRequestEventCollectionFactoryMock = $this->createPartialMock(
+            \Magento\Security\Model\ResourceModel\PasswordResetRequestEvent\CollectionFactory::class,
+            ['create']
         );
 
-        $this->passwordResetRequestEventCollectionFactoryMock = $this->getMock(
-            '\Magento\Security\Model\ResourceModel\PasswordResetRequestEvent\CollectionFactory',
-            ['create'],
-            [],
-            '',
-            false
+        $this->passwordResetRequestEventCollectionMock = $this->createPartialMock(
+            \Magento\Security\Model\ResourceModel\PasswordResetRequestEvent\Collection::class,
+            ['deleteRecordsOlderThen']
         );
 
-        $this->passwordResetRequestEventCollectionMock = $this->getMock(
-            '\Magento\Security\Model\ResourceModel\PasswordResetRequestEvent\Collection',
-            ['deleteRecordsOlderThen'],
-            [],
-            '',
-            false
+        $this->passwordResetRequestEventFactoryMock = $this->createPartialMock(
+            \Magento\Security\Model\PasswordResetRequestEventFactory::class,
+            ['create']
         );
 
-        $this->passwordResetRequestEventFactoryMock = $this->getMock(
-            '\Magento\Security\Model\PasswordResetRequestEventFactory',
-            ['create'],
-            [],
-            '',
-            false
+        $this->passwordResetRequestEventMock = $this->createPartialMock(
+            \Magento\Security\Model\PasswordResetRequestEvent::class,
+            ['setRequestType', 'setAccountReference', 'setIp', 'save']
         );
 
-        $this->passwordResetRequestEventMock = $this->getMock(
-            '\Magento\Security\Model\PasswordResetRequestEvent',
-            ['setRequestType', 'setAccountReference', 'setIp', 'save'],
-            [],
-            '',
-            false
-        );
-
-        $securityChecker = $this->getMock(
-            '\Magento\Security\Model\SecurityChecker\SecurityCheckerInterface',
-            [],
-            [],
-            '',
-            false
-        );
+        $securityChecker = $this->createMock(\Magento\Security\Model\SecurityChecker\SecurityCheckerInterface::class);
 
         $this->eventManagerMock = $this->getMockForAbstractClass(
-            'Magento\Framework\Event\ManagerInterface',
+            \Magento\Framework\Event\ManagerInterface::class,
             [],
             '',
             false,
@@ -104,14 +97,24 @@ class SecurityManagerTest extends \PHPUnit_Framework_TestCase
             ['dispatch']
         );
 
+        $this->dateTimeMock =  $this->getMockBuilder(DateTime::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $this->remoteAddressMock =  $this->getMockBuilder(RemoteAddress::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
         $this->model = $this->objectManager->getObject(
-            '\Magento\Security\Model\SecurityManager',
+            SecurityManager::class,
             [
                 'securityConfig' => $this->securityConfigMock,
-                'passwordResetRequestEventModelFactory' => $this->passwordResetRequestEventFactoryMock,
+                'passwordResetRequestEventFactory' => $this->passwordResetRequestEventFactoryMock,
                 'passwordResetRequestEventCollectionFactory' => $this->passwordResetRequestEventCollectionFactoryMock,
                 'eventManager' => $this->eventManagerMock,
-                'securityCheckers' => [$securityChecker]
+                'securityCheckers' => [$securityChecker],
+                'dateTime' => $this->dateTimeMock,
+                'remoteAddress' => $this->remoteAddressMock
             ]
         );
     }
@@ -121,16 +124,10 @@ class SecurityManagerTest extends \PHPUnit_Framework_TestCase
      */
     public function testConstructorException()
     {
-        $securityChecker = $this->getMock(
-            '\Magento\Framework\Message\ManagerInterface',
-            [],
-            [],
-            '',
-            false
-        );
+        $securityChecker = $this->createMock(\Magento\Framework\Message\ManagerInterface::class);
 
-        $this->setExpectedException(
-            '\Magento\Framework\Exception\LocalizedException',
+        $this->expectException(
+            \Magento\Framework\Exception\LocalizedException::class,
             __('Incorrect Security Checker class. It has to implement SecurityCheckerInterface')
         );
 
@@ -139,6 +136,8 @@ class SecurityManagerTest extends \PHPUnit_Framework_TestCase
             $this->passwordResetRequestEventFactoryMock,
             $this->passwordResetRequestEventCollectionFactoryMock,
             $this->eventManagerMock,
+            $this->dateTimeMock,
+            $this->remoteAddressMock,
             [$securityChecker]
         );
     }
@@ -152,8 +151,8 @@ class SecurityManagerTest extends \PHPUnit_Framework_TestCase
         $accountReference = \Magento\Security\Model\Config\Source\ResetMethod::OPTION_BY_IP_AND_EMAIL;
         $longIp = 12345;
 
-        $this->securityConfigMock->expects($this->once())
-            ->method('getRemoteIp')
+        $this->remoteAddressMock->expects($this->once())
+            ->method('getRemoteAddress')
             ->will($this->returnValue($longIp));
 
         $this->passwordResetRequestEventFactoryMock->expects($this->once())
@@ -193,8 +192,8 @@ class SecurityManagerTest extends \PHPUnit_Framework_TestCase
             ->method('create')
             ->willReturn($this->passwordResetRequestEventCollectionMock);
 
-        $this->securityConfigMock->expects($this->once())
-            ->method('getCurrentTimestamp')
+        $this->dateTimeMock->expects($this->once())
+            ->method('gmtTimestamp')
             ->willReturn($timestamp);
 
         $this->passwordResetRequestEventCollectionMock->expects($this->once())

@@ -1,8 +1,12 @@
 /**
- * Copyright � 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/**
+ * @api
+ * @deprecated since version 2.2.0
+ */
 define([
     'Magento_Ui/js/form/components/button',
     'uiRegistry',
@@ -50,6 +54,19 @@ define([
                     'value',
                     'listingData'
                 ]);
+
+            return this;
+        },
+
+        /**
+         * Calls 'destroy' of parent and
+         * clear listing provider source
+         *
+         * @returns {Object} Chainable.
+         */
+        destroy: function () {
+            this._super();
+            this.source.set(this.listingDataProvider, []);
 
             return this;
         },

@@ -2,11 +2,12 @@
 /**
  * Test for \Magento\Framework\Filesystem\Directory\Write
  *
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Framework\Filesystem\Directory;
 
+use Magento\Framework\Exception\ValidatorException;
 use Magento\Framework\Filesystem\DriverPool;
 use Magento\TestFramework\Helper\Bootstrap;
 
@@ -14,7 +15,7 @@ use Magento\TestFramework\Helper\Bootstrap;
  * Class ReadTest
  * Test for Magento\Framework\Filesystem\Directory\Read class
  */
-class WriteTest extends \PHPUnit_Framework_TestCase
+class WriteTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Test data to be cleaned
@@ -28,7 +29,7 @@ class WriteTest extends \PHPUnit_Framework_TestCase
      */
     public function testInstance()
     {
-        $dir = $this->getDirectoryInstance('newDir1', 0770);
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
         $this->assertTrue($dir instanceof ReadInterface);
         $this->assertTrue($dir instanceof WriteInterface);
     }
@@ -56,11 +57,25 @@ class WriteTest extends \PHPUnit_Framework_TestCase
     public function createProvider()
     {
         return [
-            ['newDir1', 0770, "newDir1"],
-            ['newDir1', 0770, "root_dir1/subdir1/subdir2"],
-            ['newDir2', 0750, "root_dir2/subdir"],
-            ['newDir1', 0770, "."]
+            ['newDir1', 0777, "newDir1"],
+            ['newDir1', 0777, "root_dir1/subdir1/subdir2"],
+            ['newDir2', 0777, "root_dir2/subdir"],
+            ['newDir1', 0777, "."]
         ];
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testCreateOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->create($path);
     }
 
     /**
@@ -71,7 +86,7 @@ class WriteTest extends \PHPUnit_Framework_TestCase
      */
     public function testDelete($path)
     {
-        $directory = $this->getDirectoryInstance('newDir', 0770);
+        $directory = $this->getDirectoryInstance('newDir', 0777);
         $directory->create($path);
         $this->assertTrue($directory->isExist($path));
         $directory->delete($path);
@@ -86,6 +101,32 @@ class WriteTest extends \PHPUnit_Framework_TestCase
     public function deleteProvider()
     {
         return [['subdir'], ['subdir/subsubdir']];
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testDeleteOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->delete($path);
+    }
+
+    /**
+     * @return array
+     */
+    public function pathDataProvider(): array
+    {
+        return [
+            ['../../Directory'],
+            ['//./..///../Directory'],
+            ['\..\..\Directory'],
+        ];
     }
 
     /**
@@ -116,7 +157,21 @@ class WriteTest extends \PHPUnit_Framework_TestCase
      */
     public function renameProvider()
     {
-        return [['newDir1', 0770, 'first_name.txt', 'second_name.txt']];
+        return [['newDir1', 0777, 'first_name.txt', 'second_name.txt']];
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testRenameOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->renameFile($path . '/ReadTest.php', 'RenamedTest');
     }
 
     /**
@@ -150,7 +205,7 @@ class WriteTest extends \PHPUnit_Framework_TestCase
      */
     public function renameTargetDirProvider()
     {
-        return [['dir1', 'dir2', 0770, 'first_name.txt', 'second_name.txt']];
+        return [['dir1', 'dir2', 0777, 'first_name.txt', 'second_name.txt']];
     }
 
     /**
@@ -180,9 +235,38 @@ class WriteTest extends \PHPUnit_Framework_TestCase
     public function copyProvider()
     {
         return [
-            ['newDir1', 0770, 'first_name.txt', 'second_name.txt'],
-            ['newDir1', 0770, 'subdir/first_name.txt', 'subdir/second_name.txt']
+            ['newDir1', 0777, 'first_name.txt', 'second_name.txt'],
+            ['newDir1', 0777, 'subdir/first_name.txt', 'subdir/second_name.txt']
         ];
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testCopyFromOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->copyFile($path . '/ReadTest.php', 'CopiedTest');
+    }
+
+    /**
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     */
+    public function testCopyToOutside()
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+        $dir->touch('test_file_for_copy_outside.txt');
+
+        $dir->copyFile(
+            'test_file_for_copy_outside.txt',
+            '../../Directory/copied_outside.txt'
+        );
     }
 
     /**
@@ -216,8 +300,8 @@ class WriteTest extends \PHPUnit_Framework_TestCase
     public function copyTargetDirProvider()
     {
         return [
-            ['dir1', 'dir2', 0770, 'first_name.txt', 'second_name.txt'],
-            ['dir1', 'dir2', 0770, 'subdir/first_name.txt', 'subdir/second_name.txt']
+            ['dir1', 'dir2', 0777, 'first_name.txt', 'second_name.txt'],
+            ['dir1', 'dir2', 0777, 'subdir/first_name.txt', 'subdir/second_name.txt']
         ];
     }
 
@@ -226,9 +310,23 @@ class WriteTest extends \PHPUnit_Framework_TestCase
      */
     public function testChangePermissions()
     {
-        $directory = $this->getDirectoryInstance('newDir1', 0770);
+        $directory = $this->getDirectoryInstance('newDir1', 0777);
         $directory->create('test_directory');
-        $this->assertTrue($directory->changePermissions('test_directory', 0640));
+        $this->assertTrue($directory->changePermissions('test_directory', 0644));
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testChangePermissionsOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->changePermissions($path, 0777);
     }
 
     /**
@@ -241,7 +339,21 @@ class WriteTest extends \PHPUnit_Framework_TestCase
         $directory->create('test_directory/subdirectory');
         $directory->writeFile('test_directory/subdirectory/test_file.txt', 'Test Content');
 
-        $this->assertTrue($directory->changePermissionsRecursively('test_directory', 0750, 0640));
+        $this->assertTrue($directory->changePermissionsRecursively('test_directory', 0777, 0644));
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testChangePermissionsRecursivelyOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->changePermissionsRecursively($path, 0777, 0777);
     }
 
     /**
@@ -269,9 +381,23 @@ class WriteTest extends \PHPUnit_Framework_TestCase
     public function touchProvider()
     {
         return [
-            ['test_directory', 0770, 'touch_file.txt', time() - 3600],
-            ['test_directory', 0770, 'subdirectory/touch_file.txt', time() - 3600]
+            ['test_directory', 0777, 'touch_file.txt', time() - 3600],
+            ['test_directory', 0777, 'subdirectory/touch_file.txt', time() - 3600]
         ];
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testTouchOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->touch($path . '/foo.txt');
     }
 
     /**
@@ -279,10 +405,27 @@ class WriteTest extends \PHPUnit_Framework_TestCase
      */
     public function testIsWritable()
     {
-        $directory = $this->getDirectoryInstance('newDir1', 0770);
+        $directory = $this->getDirectoryInstance('newDir1', 0777);
         $directory->create('bar');
         $this->assertFalse($directory->isWritable('not_existing_dir'));
         $this->assertTrue($directory->isWritable('bar'));
+    }
+
+    /**
+     * @return void
+     */
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testIsWritableOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->isWritable($path);
     }
 
     /**
@@ -310,9 +453,23 @@ class WriteTest extends \PHPUnit_Framework_TestCase
     public function openFileProvider()
     {
         return [
-            ['newDir1', 0770, 'newFile.txt', 'w+'],
-            ['newDir1', 0770, 'subdirectory/newFile.txt', 'w+']
+            ['newDir1', 0777, 'newFile.txt', 'w+'],
+            ['newDir1', 0777, 'subdirectory/newFile.txt', 'w+']
         ];
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testOpenFileOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->openFile($path . '/ReadTest.php');
     }
 
     /**
@@ -325,7 +482,7 @@ class WriteTest extends \PHPUnit_Framework_TestCase
      */
     public function testWriteFile($path, $content, $extraContent)
     {
-        $directory = $this->getDirectoryInstance('writeFileDir', 0770);
+        $directory = $this->getDirectoryInstance('writeFileDir', 0777);
         $directory->writeFile($path, $content);
         $this->assertEquals($content, $directory->readFile($path));
         $directory->writeFile($path, $extraContent);
@@ -342,7 +499,7 @@ class WriteTest extends \PHPUnit_Framework_TestCase
      */
     public function testWriteFileAppend($path, $content, $extraContent)
     {
-        $directory = $this->getDirectoryInstance('writeFileDir', 0770);
+        $directory = $this->getDirectoryInstance('writeFileDir', 0777);
         $directory->writeFile($path, $content, 'a+');
         $this->assertEquals($content, $directory->readFile($path));
         $directory->writeFile($path, $extraContent, 'a+');
@@ -357,6 +514,20 @@ class WriteTest extends \PHPUnit_Framework_TestCase
     public function writeFileProvider()
     {
         return [['file1', '123', '456'], ['folder1/file1', '123', '456']];
+    }
+
+    /**
+     * @param string $path
+     *
+     * @return void
+     * @expectedException \Magento\Framework\Exception\ValidatorException
+     * @dataProvider pathDataProvider
+     */
+    public function testWriteFileOutside(string $path)
+    {
+        $dir = $this->getDirectoryInstance('newDir1', 0777);
+
+        $dir->writeFile($path . '/ReadTest.php', 'tst');
     }
 
     /**
@@ -385,7 +556,7 @@ class WriteTest extends \PHPUnit_Framework_TestCase
         $fullPath = __DIR__ . '/../_files/' . $path;
         $objectManager = Bootstrap::getObjectManager();
         /** @var \Magento\Framework\Filesystem\Directory\WriteFactory $directoryFactory */
-        $directoryFactory = $objectManager->create('Magento\Framework\Filesystem\Directory\WriteFactory');
+        $directoryFactory = $objectManager->create(\Magento\Framework\Filesystem\Directory\WriteFactory::class);
         $directory = $directoryFactory->create($fullPath, DriverPool::FILE, $permissions);
         $this->testDirectories[] = $directory;
         return $directory;

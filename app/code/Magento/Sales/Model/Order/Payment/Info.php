@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -13,6 +13,8 @@ use Magento\Payment\Model\InfoInterface;
 /**
  *
  * Payment information model
+ * @api
+ * @since 100.0.2
  */
 class Info extends AbstractModel implements InfoInterface
 {
@@ -226,9 +228,6 @@ class Info extends AbstractModel implements InfoInterface
     {
         $additionalInfo = $this->getData('additional_information');
         if (empty($this->additionalInformation) && $additionalInfo) {
-            if (!is_array($additionalInfo)) {
-                $additionalInfo = unserialize($additionalInfo);
-            }
             $this->additionalInformation = $additionalInfo;
         }
     }

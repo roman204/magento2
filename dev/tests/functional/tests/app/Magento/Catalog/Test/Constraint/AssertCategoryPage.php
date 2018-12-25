@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -161,6 +161,13 @@ class AssertCategoryPage extends AbstractConstraint
     {
         $errorMessage = [];
 
+        if (!$this->categoryViewPage->getViewBlock()->isVisible()) {
+            $errorMessage[] =
+                'Category Content is not visible.'
+                 . "Skipped verifying Content settings for category {$categoryData['name']}.";
+            return $errorMessage;
+        }
+
         if (isset($categoryData['description'])) {
             $description = $this->categoryViewPage->getViewBlock()->getDescription();
             if ($categoryData['description'] != $description) {
@@ -170,8 +177,7 @@ class AssertCategoryPage extends AbstractConstraint
             }
         }
 
-        if (
-            isset($categoryData['landing_page'])
+        if (isset($categoryData['landing_page'])
             && isset($categoryData['display_mode'])
             && in_array($categoryData['display_mode'], $this->visibleCmsBlockMode)
         ) {
@@ -205,12 +211,12 @@ class AssertCategoryPage extends AbstractConstraint
         //TODO: verify display_mode
 
         if (isset($categoryData['default_sort_by'])) {
-            $sortBy = strtolower($categoryData['default_sort_by']);
-            $sortType = $this->categoryViewPage->getTopToolbar()->getSelectSortType();
-            if ($sortBy != $sortType) {
+            $expected = $categoryData['default_sort_by'];
+            $actual = $this->categoryViewPage->getTopToolbar()->getSelectSortType();
+            if ($expected != $actual) {
                 $errorMessage[] = 'Wrong sorting type.'
-                    . "\nExpected: " . $sortBy
-                    . "\nActual: " . $sortType;
+                    . "\nExpected: " . $expected
+                    . "\nActual: " . $actual;
             }
         }
 
@@ -254,15 +260,15 @@ class AssertCategoryPage extends AbstractConstraint
             $errorMessage[] = 'Wrong page URL.'
                 . "\nExpected: " . $categoryUrl
                 . "\nActual: " . $this->browser->getUrl();
-        };
+        }
 
         if (isset($categoryData['meta_title'])) {
-            $actual = $this->categoryViewPage->getMetaInformation()->getTitle();
+            $actual = $this->browser->getTitle();
             if ($categoryData['meta_title'] != $actual) {
                 $errorMessage[] = 'Wrong page title.'
                     . "\nExpected: " . $categoryData['meta_title']
                     . "\nActual: " . $actual;
-            };
+            }
         }
 
         return $errorMessage;

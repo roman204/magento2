@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Controller\Adminhtml\Index;
@@ -10,6 +10,7 @@ use Magento\Framework\Controller\ResultFactory;
 use Magento\Framework\App\ResponseInterface;
 use Magento\Framework\Controller\ResultInterface;
 use Magento\Backend\App\Action\Context;
+use Magento\Framework\Exception\NotFoundException;
 use Magento\Ui\Component\MassAction\Filter;
 use Magento\Customer\Model\ResourceModel\Customer\CollectionFactory;
 
@@ -60,6 +61,10 @@ abstract class AbstractMassAction extends \Magento\Backend\App\Action
      */
     public function execute()
     {
+        if (!$this->getRequest()->isPost()) {
+            throw new NotFoundException(__('Page not found'));
+        }
+
         try {
             $collection = $this->filter->getCollection($this->collectionFactory->create());
             return $this->massAction($collection);
@@ -73,7 +78,7 @@ abstract class AbstractMassAction extends \Magento\Backend\App\Action
 
     /**
      * Return component referer url
-     * TODO: Technical dept referer url should be implement as a part of Action configuration in in appropriate way
+     * TODO: Technical dept referer url should be implement as a part of Action configuration in appropriate way
      *
      * @return null|string
      */

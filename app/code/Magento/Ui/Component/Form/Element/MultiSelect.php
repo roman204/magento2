@@ -1,13 +1,13 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
 namespace Magento\Ui\Component\Form\Element;
 
 /**
- * Class MultiSelect
+ * @api
+ * @since 100.0.2
  */
 class MultiSelect extends AbstractOptionsField
 {
@@ -26,12 +26,20 @@ class MultiSelect extends AbstractOptionsField
     }
 
     /**
-     * Get component name
-     *
-     * @return string
+     * {@inheritdoc}
+     * @since 100.1.0
      */
     public function getComponentName()
     {
         return static::NAME;
+    }
+
+    /**
+     * {@inheritdoc}
+     * @since 100.1.0
+     */
+    public function getIsSelected($optionValue)
+    {
+        return in_array($optionValue, (array) $this->getValue());
     }
 }

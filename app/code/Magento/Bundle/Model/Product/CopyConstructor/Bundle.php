@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Bundle\Model\Product\CopyConstructor;
@@ -24,10 +24,20 @@ class Bundle implements \Magento\Catalog\Model\Product\CopyConstructorInterface
             return;
         }
 
-        $bundleOptions = $product->getExtensionAttributes()->getBundleProductOptions();
+        $bundleOptions = $product->getExtensionAttributes()->getBundleProductOptions() ?: [];
         $duplicatedBundleOptions = [];
         foreach ($bundleOptions as $key => $bundleOption) {
-            $duplicatedBundleOptions[$key] = clone $bundleOption;
+            $duplicatedBundleOption = clone $bundleOption;
+            /**
+             * Set option and selection ids to 'null' in order to create new option(selection) for duplicated product,
+             * but not modifying existing one, which led to lost of option(selection) in original product.
+             */
+            $productLinks = $duplicatedBundleOption->getProductLinks() ?: [];
+            foreach ($productLinks as $productLink) {
+                $productLink->setSelectionId(null);
+            }
+            $duplicatedBundleOption->setOptionId(null);
+            $duplicatedBundleOptions[$key] = $duplicatedBundleOption;
         }
         $duplicate->getExtensionAttributes()->setBundleProductOptions($duplicatedBundleOptions);
     }

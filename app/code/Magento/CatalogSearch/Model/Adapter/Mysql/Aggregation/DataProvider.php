@@ -1,11 +1,13 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
+
 namespace Magento\CatalogSearch\Model\Adapter\Mysql\Aggregation;
 
 use Magento\Catalog\Model\Product;
+use Magento\CatalogSearch\Model\Adapter\Mysql\Aggregation\DataProvider\QueryBuilder;
 use Magento\Customer\Model\Session;
 use Magento\Eav\Model\Config;
 use Magento\Framework\App\ResourceConnection;
@@ -15,9 +17,10 @@ use Magento\Framework\DB\Ddl\Table;
 use Magento\Framework\DB\Select;
 use Magento\Framework\Search\Adapter\Mysql\Aggregation\DataProviderInterface;
 use Magento\Framework\Search\Request\BucketInterface;
+use Magento\Framework\App\ObjectManager;
 
 /**
- * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * DataProvider for Catalog search Mysql.
  */
 class DataProvider implements DataProviderInterface
 {
@@ -47,22 +50,30 @@ class DataProvider implements DataProviderInterface
     private $connection;
 
     /**
+     * @var QueryBuilder;
+     */
+    private $queryBuilder;
+
+    /**
      * @param Config $eavConfig
      * @param ResourceConnection $resource
      * @param ScopeResolverInterface $scopeResolver
      * @param Session $customerSession
+     * @param QueryBuilder|null $queryBuilder
      */
     public function __construct(
         Config $eavConfig,
         ResourceConnection $resource,
         ScopeResolverInterface $scopeResolver,
-        Session $customerSession
+        Session $customerSession,
+        QueryBuilder $queryBuilder = null
     ) {
         $this->eavConfig = $eavConfig;
         $this->resource = $resource;
         $this->connection = $resource->getConnection();
         $this->scopeResolver = $scopeResolver;
         $this->customerSession = $customerSession;
+        $this->queryBuilder = $queryBuilder ?: ObjectManager::getInstance()->get(QueryBuilder::class);
     }
 
     /**
@@ -73,38 +84,15 @@ class DataProvider implements DataProviderInterface
         array $dimensions,
         Table $entityIdsTable
     ) {
-        $currentScope = $dimensions['scope']->getValue();
+        $currentScope = $this->scopeResolver->getScope($dimensions['scope']->getValue())->getId();
 
         $attribute = $this->eavConfig->getAttribute(Product::ENTITY, $bucket->getField());
 
-        $select = $this->getSelect();
-
-        if ($attribute->getAttributeCode() == 'price') {
-            /** @var \Magento\Store\Model\Store $store */
-            $store = $this->scopeResolver->getScope($currentScope);
-            if (!$store instanceof \Magento\Store\Model\Store) {
-                throw new \RuntimeException('Illegal scope resolved');
-            }
-            $table = $this->resource->getTableName('catalog_product_index_price');
-            $select->from(['main_table' => $table], null)
-                ->columns([BucketInterface::FIELD_VALUE => 'main_table.min_price'])
-                ->where('main_table.customer_group_id = ?', $this->customerSession->getCustomerGroupId())
-                ->where('main_table.website_id = ?', $store->getWebsiteId());
-        } else {
-            $currentScopeId = $this->scopeResolver->getScope($currentScope)
-                ->getId();
-            $table = $this->resource->getTableName(
-                'catalog_product_index_eav' . ($attribute->getBackendType() == 'decimal' ? '_decimal' : '')
-            );
-            $select->from(['main_table' => $table], ['value'])
-                ->where('main_table.attribute_id = ?', $attribute->getAttributeId())
-                ->where('main_table.store_id = ? ', $currentScopeId);
-        }
-
-        $select->joinInner(
-            ['entities' => $entityIdsTable->getName()],
-            'main_table.entity_id  = entities.entity_id',
-            []
+        $select = $this->queryBuilder->build(
+            $attribute,
+            $entityIdsTable->getName(),
+            $currentScope,
+            $this->customerSession->getCustomerGroupId()
         );
 
         return $select;
@@ -116,13 +104,5 @@ class DataProvider implements DataProviderInterface
     public function execute(Select $select)
     {
         return $this->connection->fetchAssoc($select);
-    }
-
-    /**
-     * @return Select
-     */
-    private function getSelect()
-    {
-        return $this->connection->select();
     }
 }

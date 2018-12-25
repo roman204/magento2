@@ -1,22 +1,23 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 // @codingStandardsIgnoreFile
+namespace Magento\Widget\Block\Adminhtml;
 
 /**
  * WYSIWYG widget plugin main block
  *
- * @author     Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
+ * @SuppressWarnings(PHPMD.RequestAwareBlockMethod)
  */
-namespace Magento\Widget\Block\Adminhtml;
-
 class Widget extends \Magento\Backend\Block\Widget\Form\Container
 {
     /**
-     * @return void
+     * @inheritdoc
      */
     protected function _construct()
     {
@@ -36,12 +37,16 @@ class Widget extends \Magento\Backend\Block\Widget\Form\Container
         $this->buttonList->update('save', 'region', 'footer');
         $this->buttonList->update('save', 'data_attribute', []);
 
-        $this->_formScripts[] = 'require(["mage/adminhtml/wysiwyg/widget"], function(){wWidget = new WysiwygWidget.Widget(' .
-            '"widget_options_form", "select_widget_type", "widget_options", "' .
-            $this->getUrl(
-                'adminhtml/*/loadOptions'
-            ) . '", "' . $this->getRequest()->getParam(
-                'widget_target_id'
-            ) . '");});';
+        $this->_formScripts[] = <<<EOJS
+ 		require(['mage/adminhtml/wysiwyg/widget'], function() {
+ 		    wWidget = new WysiwygWidget.Widget(
+ 		        'widget_options_form',
+ 		        'select_widget_type',
+ 		        'widget_options',
+ 		        '{$this->getUrl('adminhtml/*/loadOptions')}',
+ 		        '{$this->escapeJs($this->getRequest()->getParam('widget_target_id'))}'
+ 		    );
+ 		});
+EOJS;
     }
 }

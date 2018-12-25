@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Sales\Model;
@@ -78,7 +78,8 @@ class Download
         $this->_fileFactory->create(
             $info['title'],
             ['value' => $this->_rootDir->getRelativePath($relativePath), 'type' => 'filename'],
-            $this->rootDirBasePath
+            $this->rootDirBasePath,
+            $info['type']
         );
     }
 
@@ -89,7 +90,8 @@ class Download
     protected function _isCanProcessed($relativePath)
     {
         $filePath = $this->_rootDir->getAbsolutePath($relativePath);
-        return (strpos($this->_rootDir->getDriver()->getRealPath($filePath), $relativePath) !== false
+        $pathWithFixedSeparator = str_replace('\\', '/', $this->_rootDir->getDriver()->getRealPath($filePath));
+        return (strpos($pathWithFixedSeparator, $relativePath) !== false
             && $this->_rootDir->isFile($relativePath) && $this->_rootDir->isReadable($relativePath))
             || $this->_processDatabaseFile($filePath, $relativePath);
     }

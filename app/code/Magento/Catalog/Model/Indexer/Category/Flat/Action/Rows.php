@@ -1,13 +1,12 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\Indexer\Category\Flat\Action;
 
 use Magento\Catalog\Api\CategoryRepositoryInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Framework\Model\Entity\MetadataPool;
 
 class Rows extends \Magento\Catalog\Model\Indexer\Category\Flat\AbstractAction
 {
@@ -20,20 +19,16 @@ class Rows extends \Magento\Catalog\Model\Indexer\Category\Flat\AbstractAction
      * @param \Magento\Framework\App\ResourceConnection $resource
      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
      * @param \Magento\Catalog\Model\ResourceModel\Helper $resourceHelper
-     * @param MetadataPool $metadataPool
-     * @param array $skipStaticColumns
      * @param CategoryRepositoryInterface $categoryRepository
      */
     public function __construct(
         \Magento\Framework\App\ResourceConnection $resource,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         \Magento\Catalog\Model\ResourceModel\Helper $resourceHelper,
-        MetadataPool $metadataPool,
-        CategoryRepositoryInterface $categoryRepository,
-        $skipStaticColumns = []
+        CategoryRepositoryInterface $categoryRepository
     ) {
         $this->categoryRepository = $categoryRepository;
-        parent::__construct($resource, $storeManager, $resourceHelper, $metadataPool, $skipStaticColumns);
+        parent::__construct($resource, $storeManager, $resourceHelper);
     }
 
     /**
@@ -74,22 +69,24 @@ class Rows extends \Magento\Catalog\Model\Indexer\Category\Flat\AbstractAction
                 $categoriesIdsChunk = $this->filterIdsByStore($categoriesIdsChunk, $store);
 
                 $attributesData = $this->getAttributeValues($categoriesIdsChunk, $store->getId());
+                $linkField = $this->categoryMetadata->getLinkField();
                 $data = [];
                 foreach ($categoriesIdsChunk as $categoryId) {
-                    if (!isset($attributesData[$categoryId])) {
-                        continue;
-                    }
-
                     try {
                         $category = $this->categoryRepository->get($categoryId);
                     } catch (NoSuchEntityException $e) {
                         continue;
                     }
 
+                    $categoryData = $category->getData();
+                    if (!isset($attributesData[$categoryData[$linkField]])) {
+                        continue;
+                    }
+
                     $data[] = $this->prepareValuesToInsert(
                         array_merge(
-                            $category->getData(),
-                            $attributesData[$categoryId],
+                            $categoryData,
+                            $attributesData[$categoryData[$linkField]],
                             ['store_id' => $store->getId()]
                         )
                     );

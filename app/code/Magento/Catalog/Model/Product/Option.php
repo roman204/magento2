@@ -1,67 +1,47 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
 
 namespace Magento\Catalog\Model\Product;
 
 use Magento\Catalog\Api\Data\ProductCustomOptionInterface;
 use Magento\Catalog\Api\Data\ProductCustomOptionValuesInterface;
+use Magento\Catalog\Api\Data\ProductCustomOptionValuesInterfaceFactory;
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Catalog\Model\Product;
 use Magento\Catalog\Model\ResourceModel\Product\Option\Value\Collection;
 use Magento\Catalog\Pricing\Price\BasePrice;
+use Magento\Framework\EntityManager\MetadataPool;
 use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Model\AbstractExtensibleModel;
-use Magento\Framework\Model\Entity\MetadataPool;
 
 /**
  * Catalog product option model
  *
- * @method \Magento\Catalog\Model\ResourceModel\Product\Option getResource()
+ * @api
  * @method int getProductId()
  * @method \Magento\Catalog\Model\Product\Option setProductId(int $value)
  *
  * @author      Magento Core Team <core@magentocommerce.com>
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  * @SuppressWarnings(PHPMD.ExcessivePublicCount)
+ * @since 100.0.2
  */
 class Option extends AbstractExtensibleModel implements ProductCustomOptionInterface
 {
-    const OPTION_GROUP_TEXT = 'text';
-
-    const OPTION_GROUP_FILE = 'file';
-
-    const OPTION_GROUP_SELECT = 'select';
-
-    const OPTION_GROUP_DATE = 'date';
-
-    const OPTION_TYPE_FIELD = 'field';
-
-    const OPTION_TYPE_AREA = 'area';
-
-    const OPTION_TYPE_FILE = 'file';
-
-    const OPTION_TYPE_DROP_DOWN = 'drop_down';
-
-    const OPTION_TYPE_RADIO = 'radio';
-
-    const OPTION_TYPE_CHECKBOX = 'checkbox';
-
-    const OPTION_TYPE_MULTIPLE = 'multiple';
-
-    const OPTION_TYPE_DATE = 'date';
-
-    const OPTION_TYPE_DATE_TIME = 'date_time';
-
-    const OPTION_TYPE_TIME = 'time';
-
     /**
      * @var Option\Repository
+     * @since 101.0.0
      */
     protected $optionRepository;
+
+    /**
+     * Option type percent
+     * @since 101.0.0
+     */
+    protected static $typePercent = 'percent';
 
     /**#@+
      * Constants
@@ -81,9 +61,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
     const KEY_IMAGE_SIZE_X = 'image_size_x';
     /**#@-*/
 
-    /**
-     * @var Product
-     */
+    /**#@-*/
     protected $product;
 
     /**
@@ -119,10 +97,16 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
      * @var Option\Validator\Pool
      */
     protected $validatorPool;
+
     /**
      * @var MetadataPool
      */
     private $metadataPool;
+
+    /**
+     * @var ProductCustomOptionValuesInterfaceFactory
+     */
+    private $customOptionValuesFactory;
 
     /**
      * @param \Magento\Framework\Model\Context $context
@@ -133,11 +117,10 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
      * @param Option\Type\Factory $optionFactory
      * @param \Magento\Framework\Stdlib\StringUtils $string
      * @param Option\Validator\Pool $validatorPool
-     * @param \Magento\Catalog\Model\Product\Option\Repository $optionRepository ,
-     * @param MetadataPool $metadataPool
      * @param \Magento\Framework\Model\ResourceModel\AbstractResource $resource
      * @param \Magento\Framework\Data\Collection\AbstractDb $resourceCollection
      * @param array $data
+     * @param ProductCustomOptionValuesInterfaceFactory|null $customOptionValuesFactory
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
@@ -149,18 +132,18 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
         \Magento\Catalog\Model\Product\Option\Type\Factory $optionFactory,
         \Magento\Framework\Stdlib\StringUtils $string,
         Option\Validator\Pool $validatorPool,
-        \Magento\Catalog\Model\Product\Option\Repository $optionRepository,
-        MetadataPool $metadataPool,
         \Magento\Framework\Model\ResourceModel\AbstractResource $resource = null,
         \Magento\Framework\Data\Collection\AbstractDb $resourceCollection = null,
-        array $data = []
+        array $data = [],
+        ProductCustomOptionValuesInterfaceFactory $customOptionValuesFactory = null
     ) {
         $this->productOptionValue = $productOptionValue;
         $this->optionTypeFactory = $optionFactory;
         $this->validatorPool = $validatorPool;
         $this->string = $string;
-        $this->optionRepository = $optionRepository;
-        $this->metadataPool = $metadataPool;
+        $this->customOptionValuesFactory = $customOptionValuesFactory ?:
+            \Magento\Framework\App\ObjectManager::getInstance()->get(ProductCustomOptionValuesInterfaceFactory::class);
+
         parent::__construct(
             $context,
             $registry,
@@ -176,6 +159,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
      * Get resource instance
      *
      * @return \Magento\Framework\Model\ResourceModel\Db\AbstractDb
+     * @deprecated 101.1.0 because resource models should be used directly
      */
     protected function _getResource()
     {
@@ -187,7 +171,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
      */
     protected function _construct()
     {
-        $this->_init('Magento\Catalog\Model\ResourceModel\Product\Option');
+        $this->_init(\Magento\Catalog\Model\ResourceModel\Product\Option::class);
         parent::_construct();
     }
 
@@ -216,6 +200,18 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
         }
 
         return null;
+    }
+
+    /**
+     * Whether or not the option type contains sub-values
+     *
+     * @param string $type
+     * @return bool
+     * @since 101.1.0
+     */
+    public function hasValues($type = null)
+    {
+        return $this->getGroupByType($type) == self::OPTION_GROUP_SELECT;
     }
 
     /**
@@ -327,7 +323,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
             self::OPTION_TYPE_TIME => self::OPTION_GROUP_DATE,
         ];
 
-        return isset($optionGroupsToTypes[$type]) ? $optionGroupsToTypes[$type] : '';
+        return $optionGroupsToTypes[$type] ?? '';
     }
 
     /**
@@ -351,6 +347,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
     /**
      * {@inheritdoc}
      * @SuppressWarnings(PHPMD.CyclomaticComplexity)
+     * @since 101.0.0
      */
     public function beforeSave()
     {
@@ -391,6 +388,11 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
                 }
             }
         }
+
+        if ($this->getGroupByType($this->getData('type')) === self::OPTION_GROUP_FILE) {
+            $this->cleanFileExtensions();
+        }
+
         return $this;
     }
 
@@ -400,20 +402,21 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
      */
     public function afterSave()
     {
-        $this->getValueInstance()->unsetValues();
         $values = $this->getValues() ?: $this->getData('values');
         if (is_array($values)) {
             foreach ($values as $value) {
-                if ($value instanceof \Magento\Catalog\Api\Data\ProductCustomOptionValuesInterface) {
+                if ($value instanceof ProductCustomOptionValuesInterface) {
                     $data = $value->getData();
                 } else {
                     $data = $value;
                 }
-                $this->getValueInstance()->addValue($data);
-            }
 
-            $this->getValueInstance()->setOption($this)->saveValues();
-        } elseif ($this->getGroupByType($this->getType()) == self::OPTION_GROUP_SELECT) {
+                $this->customOptionValuesFactory->create()
+                    ->addValue($data)
+                    ->setOption($this)
+                    ->saveValues();
+            }
+        } elseif ($this->getGroupByType($this->getType()) === self::OPTION_GROUP_SELECT) {
             throw new LocalizedException(__('Select type options required values rows.'));
         }
 
@@ -429,7 +432,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
      */
     public function getPrice($flag = false)
     {
-        if ($flag && $this->getPriceType() == 'percent') {
+        if ($flag && $this->getPriceType() == self::$typePercent) {
             $basePrice = $this->getProduct()->getPriceInfo()->getPrice(BasePrice::PRICE_CODE)->getValue();
             $price = $basePrice * ($this->_getData(self::KEY_PRICE) / 100);
             return $price;
@@ -466,10 +469,11 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
      *
      * @param Product $product
      * @return \Magento\Catalog\Model\ResourceModel\Product\Option\Collection
+     * @since 101.0.0
      */
     public function getProductOptions(Product $product)
     {
-        return $this->optionRepository->getProductOptions($product, $this->getAddRequiredFilter());
+        return $this->getOptionRepository()->getProductOptions($product, $this->getAddRequiredFilter());
     }
 
     /**
@@ -567,7 +571,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
     public function getProductSku()
     {
         $productSku = $this->_getData(self::KEY_PRODUCT_SKU);
-        if (!$productSku) {
+        if (!$productSku && $this->getProduct()) {
             $productSku = $this->getProduct()->getSku();
         }
         return $productSku;
@@ -676,6 +680,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
     {
         return $this->getData(self::KEY_IMAGE_SIZE_Y);
     }
+
     /**
      * Set product SKU
      *
@@ -812,7 +817,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
     }
 
     /**
-     * @param \Magento\Catalog\Api\Data\ProductCustomOptionValuesInterface[] $values
+     * @param ProductCustomOptionValuesInterface[] $values
      * @return $this
      */
     public function setValues(array $values = null)
@@ -832,6 +837,22 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
     }
 
     /**
+     * Return regular price.
+     *
+     * @return float|int
+     * @since 101.0.0
+     */
+    public function getRegularPrice()
+    {
+        if ($this->getPriceType() == self::$typePercent) {
+            $basePrice = $this->getProduct()->getPriceInfo()->getPrice('regular_price')->getAmount()->getValue();
+            $price = $basePrice * ($this->_getData(self::KEY_PRICE) / 100);
+            return $price;
+        }
+        return $this->_getData(self::KEY_PRICE);
+    }
+
+    /**
      * @param Product $product
      * @return \Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection
      */
@@ -840,7 +861,7 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
         $collection = clone $this->getCollection();
         $collection->addFieldToFilter(
             'product_id',
-            $product->getData($this->metadataPool->getMetadata(ProductInterface::class)->getLinkField())
+            $product->getData($this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField())
         )->addTitleToResult(
             $product->getStoreId()
         )->addPriceToResult(
@@ -872,5 +893,47 @@ class Option extends AbstractExtensibleModel implements ProductCustomOptionInter
     ) {
         return $this->_setExtensionAttributes($extensionAttributes);
     }
+
+    /**
+     * @return Option\Repository
+     */
+    private function getOptionRepository()
+    {
+        if (null === $this->optionRepository) {
+            $this->optionRepository = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Catalog\Model\Product\Option\Repository::class);
+        }
+        return $this->optionRepository;
+    }
+
+    /**
+     * @return \Magento\Framework\EntityManager\MetadataPool
+     */
+    private function getMetadataPool()
+    {
+        if (null === $this->metadataPool) {
+            $this->metadataPool = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\EntityManager\MetadataPool::class);
+        }
+        return $this->metadataPool;
+    }
+
+    /**
+     * Clears all non-accepted characters from file_extension field.
+     *
+     * @return void
+     */
+    private function cleanFileExtensions()
+    {
+        $extensions = '';
+        $rawExtensions = $this->getFileExtension();
+        $matches = [];
+        preg_match_all('/(?<extensions>[a-z0-9]+)/i', strtolower($rawExtensions), $matches);
+        if (!empty($matches)) {
+            $extensions = implode(', ', array_unique($matches['extensions']));
+        }
+        $this->setFileExtension($extensions);
+    }
+
     //@codeCoverageIgnoreEnd
 }

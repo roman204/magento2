@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\CatalogInventory\Model;
@@ -97,6 +97,11 @@ class Configuration implements StockConfigurationInterface
     const XML_PATH_DISPLAY_PRODUCT_STOCK_STATUS = 'cataloginventory/options/display_product_stock_status';
 
     /**
+     * Threshold qty config path
+     */
+    const XML_PATH_STOCK_THRESHOLD_QTY = 'cataloginventory/options/stock_threshold_qty';
+
+    /**
      * @var ConfigInterface
      */
     protected $config;
@@ -148,7 +153,9 @@ class Configuration implements StockConfigurationInterface
      */
     public function getDefaultScopeId()
     {
-        return (int) $this->storeManager->getWebsite()->getId();
+        // TODO: should be fixed in MAGETWO-46043
+        // "0" is id of admin website, which is used in backend during save entity
+        return 0;
     }
 
     /**
@@ -257,7 +264,7 @@ class Configuration implements StockConfigurationInterface
      */
     public function getEnableQtyIncrements($store = null)
     {
-        return (bool) $this->scopeConfig->getValue(
+        return (bool)$this->scopeConfig->getValue(
             self::XML_PATH_ENABLE_QTY_INCREMENTS,
             \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
             $store
@@ -378,6 +385,19 @@ class Configuration implements StockConfigurationInterface
     {
         return $this->scopeConfig->getValue(
             self::XML_PATH_ITEM . $field,
+            \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
+            $store
+        );
+    }
+
+    /**
+     * @param null|string|bool|int|\Magento\Store\Model\Store $store
+     * @return string|null
+     */
+    public function getStockThresholdQty($store = null)
+    {
+        return $this->scopeConfig->getValue(
+            self::XML_PATH_STOCK_THRESHOLD_QTY,
             \Magento\Store\Model\ScopeInterface::SCOPE_STORE,
             $store
         );

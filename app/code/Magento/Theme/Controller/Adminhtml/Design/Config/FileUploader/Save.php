@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2016 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Theme\Controller\Adminhtml\Design\Config\FileUploader;
@@ -8,33 +8,46 @@ namespace Magento\Theme\Controller\Adminhtml\Design\Config\FileUploader;
 use Magento\Backend\App\Action;
 use Magento\Backend\App\Action\Context;
 use Magento\Framework\Controller\ResultFactory;
-use Magento\Theme\Model\Design\Config\FileUploader\ImageProcessor;
+use Magento\Theme\Model\Design\Config\FileUploader\FileProcessor;
 
+/**
+ * File Uploads Action Controller
+ *
+ * @api
+ * @since 100.1.0
+ */
 class Save extends Action
 {
     /**
-     * @var ImageProcessor
+     * @var FileProcessor
+     * @since 100.1.0
      */
-    protected $imageProcessor;
+    protected $fileProcessor;
+
+    /**
+     * Authorization level
+     */
+    const ADMIN_RESOURCE = 'Magento_Theme::theme';
 
     /**
      * @param Context $context
-     * @param ImageProcessor $imageProcessor
+     * @param FileProcessor $fileProcessor
      */
     public function __construct(
         Context $context,
-        ImageProcessor $imageProcessor
+        FileProcessor $fileProcessor
     ) {
         parent::__construct($context);
-        $this->imageProcessor = $imageProcessor;
+        $this->fileProcessor = $fileProcessor;
     }
 
     /**
      * @inheritDoc
+     * @since 100.1.0
      */
     public function execute()
     {
-        $result = $this->imageProcessor->saveToTmp(key($_FILES));
+        $result = $this->fileProcessor->saveToTmp(key($_FILES));
         return $this->resultFactory->create(ResultFactory::TYPE_JSON)->setData($result);
     }
 }

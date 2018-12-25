@@ -1,13 +1,13 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\Indexer\Product\Flat;
 
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Framework\App\ResourceConnection;
-use Magento\Framework\Model\Entity\MetadataPool;
+use Magento\Framework\EntityManager\MetadataPool;
 
 /**
  * Class FlatTableBuilder
@@ -61,15 +61,13 @@ class FlatTableBuilder
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $config
      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
      * @param TableDataInterface $tableData
-     * @param MetadataPool $metadataPool
      */
     public function __construct(
         \Magento\Catalog\Helper\Product\Flat\Indexer $productIndexerHelper,
         \Magento\Framework\App\ResourceConnection $resource,
         \Magento\Framework\App\Config\ScopeConfigInterface $config,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
-        \Magento\Catalog\Model\Indexer\Product\Flat\TableDataInterface $tableData,
-        MetadataPool $metadataPool
+        \Magento\Catalog\Model\Indexer\Product\Flat\TableDataInterface $tableData
     ) {
         $this->_productIndexerHelper = $productIndexerHelper;
         $this->resource = $resource;
@@ -77,7 +75,6 @@ class FlatTableBuilder
         $this->_config = $config;
         $this->_storeManager = $storeManager;
         $this->_tableData = $tableData;
-        $this->metadataPool = $metadataPool;
     }
 
     /**
@@ -182,6 +179,11 @@ class FlatTableBuilder
 
             $columnComment = isset($fieldProp['comment']) ? $fieldProp['comment'] : $fieldName;
 
+            if ($fieldName == 'created_at') {
+                $columnDefinition['nullable'] = true;
+                $columnDefinition['default'] = null;
+            }
+
             $table->addColumn($fieldName, $fieldProp['type'], $columnLength, $columnDefinition, $columnComment);
         }
 
@@ -211,7 +213,7 @@ class FlatTableBuilder
      */
     protected function _fillTemporaryFlatTable(array $tables, $storeId, $valueFieldSuffix)
     {
-        $linkField = $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField();
+        $linkField = $this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField();
         $select = $this->_connection->select();
         $temporaryFlatTableName = $this->_getTemporaryTableName(
             $this->_productIndexerHelper->getFlatTableName($storeId)
@@ -224,7 +226,11 @@ class FlatTableBuilder
 
         unset($tables[$entityTableName]);
 
-        $allColumns = array_merge(['entity_id', 'type_id', 'attribute_set_id'], $columnsList);
+        $allColumns = array_values(
+            array_unique(
+                array_merge(['entity_id', $linkField, 'type_id', 'attribute_set_id'], $columnsList)
+            )
+        );
 
         /* @var $status \Magento\Eav\Model\Entity\Attribute */
         $status = $this->_productIndexerHelper->getAttribute('status');
@@ -266,7 +272,7 @@ class FlatTableBuilder
 
             $select->joinLeft(
                 $temporaryTableName,
-                "e.entity_id = " . $temporaryTableName . ".entity_id",
+                sprintf('e.%1$s = %2$s.%1$s', $linkField, $temporaryTableName),
                 $columnsNames
             );
             $allColumns = array_merge($allColumns, $columnsNames);
@@ -280,7 +286,7 @@ class FlatTableBuilder
             if (!empty($columnValueNames)) {
                 $select->joinLeft(
                     $temporaryValueTableName,
-                    "e.${linkField} = " . $temporaryValueTableName . ".entity_id",
+                    sprintf('e.%1$s = %2$s.%1$s', $linkField, $temporaryValueTableName),
                     $columnValueNames
                 );
                 $allColumns = array_merge($allColumns, $columnValueNames);
@@ -309,7 +315,7 @@ class FlatTableBuilder
         $temporaryFlatTableName = $this->_getTemporaryTableName(
             $this->_productIndexerHelper->getFlatTableName($storeId)
         );
-        $linkField = $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField();
+        $linkField = $this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField();
         foreach ($tables as $tableName => $columns) {
             foreach ($columns as $attribute) {
                 /* @var $attribute \Magento\Eav\Model\Entity\Attribute */
@@ -365,5 +371,17 @@ class FlatTableBuilder
     protected function _getTemporaryTableName($tableName)
     {
         return sprintf('%s_tmp_indexer', $tableName);
+    }
+
+    /**
+     * @return \Magento\Framework\EntityManager\MetadataPool
+     */
+    private function getMetadataPool()
+    {
+        if (null === $this->metadataPool) {
+            $this->metadataPool = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\EntityManager\MetadataPool::class);
+        }
+        return $this->metadataPool;
     }
 }

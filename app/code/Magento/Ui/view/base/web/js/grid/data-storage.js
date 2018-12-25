@@ -1,6 +1,10 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
+ */
+
+/**
+ * @api
  */
 define([
     'jquery',
@@ -15,6 +19,12 @@ define([
             cacheRequests: true,
             cachedRequestDelay: 50,
             indexField: 'entity_id',
+            requestConfig: {
+                url: '${ $.updateUrl }',
+                method: 'GET',
+                dataType: 'json'
+            },
+            dataScope: '',
             data: {}
         },
 
@@ -24,7 +34,15 @@ define([
          * @returns {DataStorage} Chainable.
          */
         initConfig: function () {
+            var scope;
+
             this._super();
+
+            scope = this.dataScope;
+
+            if (typeof scope === 'string') {
+                this.dataScope = scope ? [scope] : [];
+            }
 
             this._requests = [];
 
@@ -72,13 +90,43 @@ define([
          * @returns {jQueryPromise}
          */
         getData: function (params, options) {
-            var cachedRequest = this.getRequest(params);
+            var cachedRequest;
+
+            if (this.hasScopeChanged(params)) {
+                this.clearRequests();
+            } else {
+                cachedRequest = this.getRequest(params);
+            }
 
             options = options || {};
 
             return !options.refresh && cachedRequest ?
                 this.getRequestData(cachedRequest) :
                 this.requestData(params);
+        },
+
+        /**
+         * Tells whether one of the parameters defined in the "dataScope" has
+         * changed since the last request.
+         *
+         * @param {Object} params - Request parameters.
+         * @returns {Boolean}
+         */
+        hasScopeChanged: function (params) {
+            var lastRequest = _.last(this._requests),
+                keys,
+                diff;
+
+            if (!lastRequest) {
+                return false;
+            }
+
+            diff = utils.compare(lastRequest.params, params);
+
+            keys = _.pluck(diff.changes, 'path');
+            keys = keys.concat(Object.keys(diff.containers));
+
+            return _.intersection(this.dataScope, keys).length > 0;
         },
 
         /**
@@ -103,16 +151,12 @@ define([
          * @returns {jQueryPromise}
          */
         requestData: function (params) {
-            var query   = utils.copy(params),
+            var query = utils.copy(params),
                 handler = this.onRequestComplete.bind(this, query),
                 request;
 
-            request = $.ajax({
-                url: this.updateUrl,
-                method: 'GET',
-                data: query,
-                dataType: 'json'
-            }).done(handler);
+            this.requestConfig.data = query;
+            request = $.ajax(this.requestConfig).done(handler);
 
             return request;
         },
@@ -137,9 +181,9 @@ define([
          * @returns {jQueryPromise}
          */
         getRequestData: function (request) {
-            var defer   = $.Deferred(),
+            var defer = $.Deferred(),
                 resolve = defer.resolve.bind(defer),
-                delay   = this.cachedRequestDelay,
+                delay = this.cachedRequestDelay,
                 result;
 
             result = {
@@ -170,9 +214,9 @@ define([
             }
 
             this._requests.push({
-                ids:            this.getIds(data.items),
-                params:         params,
-                totalRecords:   data.totalRecords
+                ids: this.getIds(data.items),
+                params: params,
+                totalRecords: data.totalRecords
             });
 
             return this;

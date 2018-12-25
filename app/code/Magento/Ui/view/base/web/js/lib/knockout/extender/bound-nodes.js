@@ -1,8 +1,9 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/* global WeakMap */
 define([
     'ko',
     'underscore',
@@ -83,6 +84,28 @@ define([
         }
     }
 
+    /**
+     * Returns node's first sibling of 'element' type within the common component scope
+     *
+     * @param {HTMLElement} node
+     * @param {*} data
+     * @returns {HTMLElement}
+     */
+    function getElement(node, data) {
+        var elem;
+
+        while (node.nextElementSibling) {
+            node = node.nextElementSibling;
+
+            if (node.nodeType === 1 && ko.dataFor(node) === data) {
+                elem = node;
+                break;
+            }
+        }
+
+        return elem;
+    }
+
     wrapper.extend(ko, {
 
         /**
@@ -90,16 +113,20 @@ define([
          * to track nodes associated with model.
          *
          * @param {Function} orig - Original 'applyBindings' method.
+         * @param {Object} ctx
+         * @param {HTMLElement} node - Original 'applyBindings' method.
          */
         applyBindings: function (orig, ctx, node) {
             var result = orig(),
-                data;
+                data = ctx && (ctx.$data || ctx);
+
+            if (node && node.nodeType === 8) {
+                node = getElement(node, data);
+            }
 
             if (!node || node.nodeType !== 1) {
                 return result;
             }
-
-            data = ctx && (ctx.$data || ctx);
 
             if (data && data.registerNodes) {
                 addBounded(data, node);
@@ -113,6 +140,7 @@ define([
          * to track nodes associated with model.
          *
          * @param {Function} orig - Original 'cleanNode' method.
+         * @param {HTMLElement} node - Original 'cleanNode' method.
          */
         cleanNode: function (orig, node) {
             var result = orig(),

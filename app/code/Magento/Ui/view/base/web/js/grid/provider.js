@@ -1,8 +1,11 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/**
+ * @api
+ */
 define([
     'jquery',
     'underscore',
@@ -18,6 +21,7 @@ define([
     return Element.extend({
         defaults: {
             firstLoad: true,
+            lastError: false,
             storageConfig: {
                 component: 'Magento_Ui/js/grid/data-storage',
                 provider: '${ $.storageConfig.name }',
@@ -25,7 +29,11 @@ define([
                 updateUrl: '${ $.update_url }'
             },
             listens: {
-                params: 'onParamsChange'
+                params: 'onParamsChange',
+                requestConfig: 'updateRequestConfig'
+            },
+            ignoreTmpls: {
+                data: true
             }
         },
 
@@ -41,6 +49,10 @@ define([
             this._super()
                 .initStorage()
                 .clearData();
+
+            // Load data when there will
+            // be no more pending assets.
+            resolver(this.reload, this);
 
             return this;
         },
@@ -112,7 +124,7 @@ define([
 
             request
                 .done(this.onReload)
-                .fail(this.onError);
+                .fail(this.onError.bind(this));
 
             return request;
         },
@@ -121,9 +133,11 @@ define([
          * Handles changes of 'params' object.
          */
         onParamsChange: function () {
-            this.firstLoad ?
-                resolver(this.reload, this) :
+            // It's necessary to make a reload only
+            // after the initial loading has been made.
+            if (!this.firstLoad) {
                 this.reload();
+            }
         },
 
         /**
@@ -133,6 +147,10 @@ define([
             if (xhr.statusText === 'abort') {
                 return;
             }
+
+            this.set('lastError', true);
+
+            this.firstLoad = false;
 
             alert({
                 content: $t('Something went wrong.')
@@ -147,8 +165,21 @@ define([
         onReload: function (data) {
             this.firstLoad = false;
 
+            this.set('lastError', false);
+
             this.setData(data)
                 .trigger('reloaded');
+        },
+
+        /**
+         * Updates storage's request configuration
+         *
+         * @param {Object} requestConfig
+         */
+        updateRequestConfig: function (requestConfig) {
+            if (this.storage()) {
+                _.extend(this.storage().requestConfig, requestConfig);
+            }
         }
     });
 });

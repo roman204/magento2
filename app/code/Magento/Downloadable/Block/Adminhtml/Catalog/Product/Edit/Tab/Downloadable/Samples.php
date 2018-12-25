@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Downloadable\Block\Adminhtml\Catalog\Product\Edit\Tab\Downloadable;
@@ -22,7 +22,7 @@ class Samples extends \Magento\Backend\Block\Widget
     /**
      * @var string
      */
-    protected $_template = 'product/edit/downloadable/samples.phtml';
+    protected $_template = 'Magento_Downloadable::product/edit/downloadable/samples.phtml';
 
     /**
      * Downloadable file
@@ -118,7 +118,7 @@ class Samples extends \Magento\Backend\Block\Widget
     public function getAddButtonHtml()
     {
         $addButton = $this->getLayout()->createBlock(
-            'Magento\Backend\Block\Widget\Button'
+            \Magento\Backend\Block\Widget\Button::class
         )->setData(
             [
                 'label' => __('Add New Link'),
@@ -220,7 +220,7 @@ class Samples extends \Magento\Backend\Block\Widget
     {
         $this->addChild(
             'upload_button',
-            'Magento\Backend\Block\Widget\Button',
+            \Magento\Backend\Block\Widget\Button::class,
             [
                 'id' => '',
                 'label' => __('Upload Files'),

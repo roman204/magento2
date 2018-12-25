@@ -1,13 +1,13 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Webapi\Test\Unit\Model\Plugin;
 
 use Magento\Integration\Model\Integration;
 
-class ManagerTest extends \PHPUnit_Framework_TestCase
+class ManagerTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Integration service mock
@@ -40,10 +40,10 @@ class ManagerTest extends \PHPUnit_Framework_TestCase
      */
     protected $integrationConfigMock;
 
-    public function setUp()
+    protected function setUp()
     {
         $this->integrationServiceMock = $this->getMockBuilder(
-            '\Magento\Integration\Api\IntegrationServiceInterface'
+            \Magento\Integration\Api\IntegrationServiceInterface::class
         )->disableOriginalConstructor()->setMethods(
             [
                 'findByName',
@@ -58,7 +58,7 @@ class ManagerTest extends \PHPUnit_Framework_TestCase
         )->getMock();
 
         $this->integrationAuthorizationServiceMock = $this->getMockBuilder(
-            '\Magento\Integration\Api\AuthorizationServiceInterface'
+            \Magento\Integration\Api\AuthorizationServiceInterface::class
         )->disableOriginalConstructor()->setMethods(
             [
                 'grantPermissions',
@@ -67,15 +67,9 @@ class ManagerTest extends \PHPUnit_Framework_TestCase
             ]
         )->getMock();
 
-        $this->subjectMock = $this->getMock(
-            'Magento\Integration\Model\ConfigBasedIntegrationManager',
-            [],
-            [],
-            '',
-            false
-        );
+        $this->subjectMock = $this->createMock(\Magento\Integration\Model\ConfigBasedIntegrationManager::class);
 
-        $this->integrationConfigMock = $this->getMockBuilder('Magento\Integration\Model\IntegrationConfig')
+        $this->integrationConfigMock = $this->getMockBuilder(\Magento\Integration\Model\IntegrationConfig::class)
             ->disableOriginalConstructor()
             ->setMethods([])
             ->getMock();

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Ui\Test\Unit\Component\Form\Element;
@@ -9,8 +9,10 @@ use Magento\Ui\Component\Form\Element\Select;
 
 /**
  * Class SelectTest
+ *
+ * @method Select getModel
  */
-class SelectTest extends AbstractOptionsFieldTest
+class SelectTest extends AbstractElementTest
 {
     /**
      * {@inheritdoc}
@@ -20,6 +22,9 @@ class SelectTest extends AbstractOptionsFieldTest
         return Select::class;
     }
 
+    /**
+     * @return mixed|void
+     */
     public function testGetComponentName()
     {
         $this->assertSame(Select::NAME, $this->getModel()->getComponentName());

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -9,16 +9,17 @@
  * bundled items should not contain products with required custom options.
  * However, if to create such a bundle product, it will be always out of stock.
  */
+/** Create simple product */
 require __DIR__ . '/../../../Magento/Catalog/_files/products.php';
 
 /** @var $objectManager \Magento\TestFramework\ObjectManager */
 $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
 /** @var \Magento\Catalog\Api\ProductRepositoryInterface $productRepository */
-$productRepository = $objectManager->create('Magento\Catalog\Api\ProductRepositoryInterface');
+$productRepository = $objectManager->create(\Magento\Catalog\Api\ProductRepositoryInterface::class);
 $sampleProduct = $productRepository->get('simple');
 
 /** @var $product \Magento\Catalog\Model\Product */
-$product = $objectManager->create('Magento\Catalog\Model\Product');
+$product = $objectManager->create(\Magento\Catalog\Model\Product::class);
 $product->setTypeId('bundle')
     ->setId(3)
     ->setAttributeSetId(4)
@@ -30,6 +31,7 @@ $product->setTypeId('bundle')
     ->setStockData(['use_config_manage_stock' => 1, 'qty' => 100, 'is_qty_decimal' => 0, 'is_in_stock' => 1])
     ->setPriceView(1)
     ->setPriceType(1)
+    ->setShipmentType(1)
     ->setPrice(10.0)
     ->setBundleOptionsData(
         [
@@ -58,7 +60,7 @@ if ($product->getBundleOptionsData()) {
     $options = [];
     foreach ($product->getBundleOptionsData() as $key => $optionData) {
         if (!(bool)$optionData['delete']) {
-            $option = $objectManager->create('Magento\Bundle\Api\Data\OptionInterfaceFactory')
+            $option = $objectManager->create(\Magento\Bundle\Api\Data\OptionInterfaceFactory::class)
                 ->create(['data' => $optionData]);
             $option->setSku($product->getSku());
             $option->setOptionId(null);
@@ -69,7 +71,7 @@ if ($product->getBundleOptionsData()) {
                 foreach ($bundleLinks[$key] as $linkData) {
                     if (!(bool)$linkData['delete']) {
                         /** @var \Magento\Bundle\Api\Data\LinkInterface$link */
-                        $link = $objectManager->create('Magento\Bundle\Api\Data\LinkInterfaceFactory')
+                        $link = $objectManager->create(\Magento\Bundle\Api\Data\LinkInterfaceFactory::class)
                             ->create(['data' => $linkData]);
                         $linkProduct = $productRepository->getById($linkData['product_id']);
                         $link->setSku($linkProduct->getSku());

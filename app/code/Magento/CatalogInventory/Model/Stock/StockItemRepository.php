@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\CatalogInventory\Model\Stock;
@@ -10,20 +10,22 @@ use Magento\CatalogInventory\Api\Data\StockItemCollectionInterfaceFactory;
 use Magento\CatalogInventory\Api\Data\StockItemInterface;
 use Magento\CatalogInventory\Api\Data\StockItemInterfaceFactory;
 use Magento\CatalogInventory\Api\StockConfigurationInterface;
-use Magento\CatalogInventory\Api\StockItemRepositoryInterface as StockItemRepositoryInterface;
+use Magento\CatalogInventory\Api\StockItemRepositoryInterface;
 use Magento\CatalogInventory\Model\Indexer\Stock\Processor;
 use Magento\CatalogInventory\Model\ResourceModel\Stock\Item as StockItemResource;
 use Magento\CatalogInventory\Model\Spi\StockStateProviderInterface;
+use Magento\CatalogInventory\Model\StockRegistryStorage;
+use Magento\Framework\App\ObjectManager;
 use Magento\Framework\DB\MapperFactory;
 use Magento\Framework\DB\QueryBuilderFactory;
 use Magento\Framework\Exception\CouldNotDeleteException;
 use Magento\Framework\Exception\CouldNotSaveException;
 use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
 use Magento\Framework\Stdlib\DateTime\DateTime;
+use Magento\Framework\Stdlib\DateTime\TimezoneInterface;
+use Magento\Catalog\Model\ResourceModel\Product\CollectionFactory;
 
 /**
- * Class StockItemRepository
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class StockItemRepository implements StockItemRepositoryInterface
@@ -75,6 +77,7 @@ class StockItemRepository implements StockItemRepositoryInterface
 
     /**
      * @var Processor
+     * @deprecated 100.2.0
      */
     protected $indexProcessor;
 
@@ -84,6 +87,18 @@ class StockItemRepository implements StockItemRepositoryInterface
     protected $dateTime;
 
     /**
+     * @var StockRegistryStorage
+     */
+    protected $stockRegistryStorage;
+
+    /**
+     * @var  \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory
+     */
+    protected $productCollectionFactory;
+
+    /**
+     * Constructor
+     *
      * @param StockConfigurationInterface $stockConfiguration
      * @param StockStateProviderInterface $stockStateProvider
      * @param StockItemResource $resource
@@ -95,6 +110,7 @@ class StockItemRepository implements StockItemRepositoryInterface
      * @param TimezoneInterface $localeDate
      * @param Processor $indexProcessor
      * @param DateTime $dateTime
+     * @param \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory|null $collectionFactory
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
@@ -108,7 +124,8 @@ class StockItemRepository implements StockItemRepositoryInterface
         MapperFactory $mapperFactory,
         TimezoneInterface $localeDate,
         Processor $indexProcessor,
-        DateTime $dateTime
+        DateTime $dateTime,
+        \Magento\Catalog\Model\ResourceModel\Product\CollectionFactory $productCollectionFactory = null
     ) {
         $this->stockConfiguration = $stockConfiguration;
         $this->stockStateProvider = $stockStateProvider;
@@ -118,31 +135,33 @@ class StockItemRepository implements StockItemRepositoryInterface
         $this->productFactory = $productFactory;
         $this->queryBuilderFactory = $queryBuilderFactory;
         $this->mapperFactory = $mapperFactory;
-        $this->mapperFactory = $mapperFactory;
         $this->localeDate = $localeDate;
         $this->indexProcessor = $indexProcessor;
         $this->dateTime = $dateTime;
+        $this->productCollectionFactory = $productCollectionFactory ?: ObjectManager::getInstance()
+            ->get(CollectionFactory::class);
     }
 
     /**
      * @inheritdoc
      */
-    public function save(\Magento\CatalogInventory\Api\Data\StockItemInterface $stockItem)
+    public function save(StockItemInterface $stockItem)
     {
         try {
             /** @var \Magento\Catalog\Model\Product $product */
-            $product = $this->productFactory->create();
-            $product->load($stockItem->getProductId());
+            $product = $this->productCollectionFactory->create()
+                ->setFlag('has_stock_status_filter')
+                ->addIdFilter($stockItem->getProductId())
+                ->addFieldToSelect('type_id')
+                ->getFirstItem();
+
             if (!$product->getId()) {
                 return $stockItem;
             }
             $typeId = $product->getTypeId() ?: $product->getTypeInstance()->getTypeId();
             $isQty = $this->stockConfiguration->isQty($typeId);
             if ($isQty) {
-                $isInStock = $this->stockStateProvider->verifyStock($stockItem);
-                if ($stockItem->getManageStock() && !$isInStock) {
-                    $stockItem->setIsInStock(false)->setStockStatusChangedAutomaticallyFlag(true);
-                }
+                $this->changeIsInStockIfNecessary($stockItem);
                 // if qty is below notify qty, update the low stock date to today date otherwise set null
                 $stockItem->setLowStockDate(null);
                 if ($this->stockStateProvider->verifyNotification($stockItem)) {
@@ -160,10 +179,8 @@ class StockItemRepository implements StockItemRepositoryInterface
             $stockItem->setStockId($stockItem->getStockId());
 
             $this->resource->save($stockItem);
-
-            $this->indexProcessor->reindexRow($stockItem->getProductId());
         } catch (\Exception $exception) {
-            throw new CouldNotSaveException(__($exception->getMessage()));
+            throw new CouldNotSaveException(__('Unable to save Stock Item'), $exception);
         }
         return $stockItem;
     }
@@ -201,8 +218,13 @@ class StockItemRepository implements StockItemRepositoryInterface
     {
         try {
             $this->resource->delete($stockItem);
+            $this->getStockRegistryStorage()->removeStockItem($stockItem->getProductId());
+            $this->getStockRegistryStorage()->removeStockStatus($stockItem->getProductId());
         } catch (\Exception $exception) {
-            throw new CouldNotDeleteException(__($exception->getMessage()));
+            throw new CouldNotDeleteException(
+                __('Unable to remove Stock Item with id "%1"', $stockItem->getItemId()),
+                $exception
+            );
         }
         return true;
     }
@@ -216,8 +238,48 @@ class StockItemRepository implements StockItemRepositoryInterface
             $stockItem = $this->get($id);
             $this->delete($stockItem);
         } catch (\Exception $exception) {
-            throw new CouldNotDeleteException(__($exception->getMessage()));
+            throw new CouldNotDeleteException(
+                __('Unable to remove Stock Item with id "%1"', $id),
+                $exception
+            );
         }
         return true;
+    }
+
+    /**
+     * @return StockRegistryStorage
+     */
+    private function getStockRegistryStorage()
+    {
+        if (null === $this->stockRegistryStorage) {
+            $this->stockRegistryStorage = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\CatalogInventory\Model\StockRegistryStorage::class);
+        }
+        return $this->stockRegistryStorage;
+    }
+
+    /**
+     * Change is_in_stock value if necessary.
+     *
+     * @param StockItemInterface $stockItem
+     *
+     * @return void
+     */
+    private function changeIsInStockIfNecessary(StockItemInterface $stockItem)
+    {
+        $isInStock = $this->stockStateProvider->verifyStock($stockItem);
+        if ($stockItem->getManageStock() && !$isInStock) {
+            $stockItem->setIsInStock(false)->setStockStatusChangedAutomaticallyFlag(true);
+        }
+
+        if ($stockItem->getManageStock()
+            && $isInStock
+            && !$stockItem->getIsInStock()
+            && $stockItem->getQty() > 0
+            && $stockItem->getOrigData(\Magento\CatalogInventory\Api\Data\StockItemInterface::QTY) <= 0
+            && $stockItem->getOrigData(\Magento\CatalogInventory\Api\Data\StockItemInterface::QTY) !== null
+        ) {
+            $stockItem->setIsInStock(true)->setStockStatusChangedAutomaticallyFlag(true);
+        }
     }
 }

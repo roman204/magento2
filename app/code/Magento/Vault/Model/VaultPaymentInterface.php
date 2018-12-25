@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Vault\Model;
@@ -10,11 +10,10 @@ use Magento\Payment\Model\MethodInterface;
 /**
  * Interface VaultPaymentInterface
  * @api
+ * @since 100.1.0
  */
 interface VaultPaymentInterface extends MethodInterface
 {
-    const CODE = 'vault';
-
     const VAULT_AUTHORIZE_COMMAND = 'vault_authorize';
 
     const VAULT_SALE_COMMAND = 'vault_sale';
@@ -24,17 +23,8 @@ interface VaultPaymentInterface extends MethodInterface
     const CAN_CAPTURE = 'can_capture_vault';
 
     /**
-     * @param string $paymentCode
-     * @param null $storeId
-     *
-     * @return bool
-     */
-    public function isActiveForPayment($paymentCode, $storeId = null);
-
-    /**
-     * @param null $storeId
-     *
      * @return string|null
+     * @since 100.1.0
      */
-    public function getProviderCode($storeId = null);
+    public function getProviderCode();
 }

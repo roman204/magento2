@@ -1,34 +1,38 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\User\Controller\Adminhtml\User;
 
 use Magento\Framework\Exception\AuthenticationException;
+use Magento\Framework\Exception\MailException;
 use Magento\Framework\Exception\State\UserLockedException;
+use Magento\Security\Model\SecurityCookie;
 
+/**
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
 class Save extends \Magento\User\Controller\Adminhtml\User
 {
     /**
-     * @var \Magento\Security\Helper\SecurityCookie
+     * @var SecurityCookie
      */
-    protected $securityCookieHelper;
+    private $securityCookie;
 
     /**
-     * @param \Magento\Backend\App\Action\Context $context
-     * @param \Magento\Framework\Registry $coreRegistry
-     * @param \Magento\User\Model\UserFactory $userFactory
-     * @param \Magento\Security\Helper\SecurityCookie $securityCookieHelper
+     * Get security cookie
+     *
+     * @return SecurityCookie
+     * @deprecated 100.1.0
      */
-    public function __construct(
-        \Magento\Backend\App\Action\Context $context,
-        \Magento\Framework\Registry $coreRegistry,
-        \Magento\User\Model\UserFactory $userFactory,
-        \Magento\Security\Helper\SecurityCookie $securityCookieHelper
-    ) {
-        parent::__construct($context, $coreRegistry, $userFactory);
-        $this->securityCookieHelper = $securityCookieHelper;
+    private function getSecurityCookie()
+    {
+        if (!($this->securityCookie instanceof SecurityCookie)) {
+            return \Magento\Framework\App\ObjectManager::getInstance()->get(SecurityCookie::class);
+        } else {
+            return $this->securityCookie;
+        }
     }
 
     /**
@@ -52,21 +56,19 @@ class Save extends \Magento\User\Controller\Adminhtml\User
             return;
         }
         $model->setData($this->_getAdminUserData($data));
-        $uRoles = $this->getRequest()->getParam('roles', []);
-        if (count($uRoles)) {
-            $model->setRoleId($uRoles[0]);
+        $userRoles = $this->getRequest()->getParam('roles', []);
+        if (count($userRoles)) {
+            $model->setRoleId($userRoles[0]);
         }
 
         /** @var $currentUser \Magento\User\Model\User */
-        $currentUser = $this->_objectManager->get('Magento\Backend\Model\Auth\Session')->getUser();
-        if ($userId == $currentUser->getId() && $this->_objectManager->get(
-            'Magento\Framework\Validator\Locale'
-        )->isValid(
-            $data['interface_locale']
-        )
+        $currentUser = $this->_objectManager->get(\Magento\Backend\Model\Auth\Session::class)->getUser();
+        if ($userId == $currentUser->getId()
+            && $this->_objectManager->get(\Magento\Framework\Validator\Locale::class)
+                ->isValid($data['interface_locale'])
         ) {
             $this->_objectManager->get(
-                'Magento\Backend\Model\Locale\Manager'
+                \Magento\Backend\Model\Locale\Manager::class
             )->switchBackendInterfaceLocale(
                 $data['interface_locale']
             );
@@ -83,17 +85,19 @@ class Save extends \Magento\User\Controller\Adminhtml\User
             $currentUser->performIdentityCheck($data[$currentUserPasswordField]);
             $model->save();
 
-            $model->sendNotificationEmailsIfRequired();
-
             $this->messageManager->addSuccess(__('You saved the user.'));
             $this->_getSession()->setUserData(false);
             $this->_redirect('adminhtml/*/');
+
+            $model->sendNotificationEmailsIfRequired();
         } catch (UserLockedException $e) {
             $this->_auth->logout();
-            $this->securityCookieHelper->setLogoutReasonCookie(
+            $this->getSecurityCookie()->setLogoutReasonCookie(
                 \Magento\Security\Model\AdminSessionsManager::LOGOUT_REASON_USER_LOCKED
             );
             $this->_redirect('adminhtml/*/');
+        } catch (MailException $exception) {
+            $this->messageManager->addErrorMessage($exception->getMessage());
         } catch (\Magento\Framework\Exception\AuthenticationException $e) {
             $this->messageManager->addError(__('You have entered an invalid password for current user.'));
             $this->redirectToEdit($model, $data);

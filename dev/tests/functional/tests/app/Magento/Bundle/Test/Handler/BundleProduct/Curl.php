@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -32,16 +32,16 @@ class Curl extends ProductCurl implements BundleProductInterface
                 'No' => 0,
             ],
             'sku_type' => [
-                'Dynamic' => 0,
-                'Fixed' => 1,
+                'Yes' => 0,
+                'No' => 1,
             ],
             'price_type' => [
-                'Dynamic' => 0,
-                'Fixed' => 1,
+                'Yes' => 0,
+                'No' => 1,
             ],
             'weight_type' => [
-                'Dynamic' => 0,
-                'Fixed' => 1,
+                'Yes' => 0,
+                'No' => 1,
             ],
             'shipment_type' => [
                 'Together' => 0,
@@ -66,6 +66,10 @@ class Curl extends ProductCurl implements BundleProductInterface
                 'No' => 0
             ],
             'gift_message_available' => [
+                'Yes' => 1,
+                'No' => 0
+            ],
+            'user_defined' => [
                 'Yes' => 1,
                 'No' => 0
             ]
@@ -98,7 +102,7 @@ class Curl extends ProductCurl implements BundleProductInterface
         parent::prepareProductDetails();
 
         if (!isset($this->fields['product']['price_type'])) {
-            $this->fields['product']['price_type'] = 'Dynamic';
+            $this->fields['product']['price_type'] = 'Yes';
         }
     }
 

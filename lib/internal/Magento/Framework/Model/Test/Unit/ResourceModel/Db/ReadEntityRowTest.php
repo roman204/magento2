@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Framework\Model\Test\Unit\ResourceModel\Db;
@@ -8,7 +8,7 @@ namespace Magento\Framework\Model\Test\Unit\ResourceModel\Db;
 /**
  * Unit test for ReadEntityRow class.
  */
-class ReadEntityRowTest extends \PHPUnit_Framework_TestCase
+class ReadEntityRowTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * Subject of testing.
@@ -28,22 +28,16 @@ class ReadEntityRowTest extends \PHPUnit_Framework_TestCase
     protected $connection;
 
     /**
-     * @var \Magento\Framework\Model\Entity\MetadataPool|\PHPUnit_Framework_MockObject_MockObject
+     * @var \Magento\Framework\EntityManager\MetadataPool|\PHPUnit_Framework_MockObject_MockObject
      */
     protected $metadataPool;
 
     protected function setUp()
     {
-        $this->select = $this->getMock(
-            'Magento\Framework\DB\Select',
-            [],
-            [],
-            '',
-            false
-        );
+        $this->select = $this->createMock(\Magento\Framework\DB\Select::class);
 
         $this->connection = $this->getMockForAbstractClass(
-            'Magento\Framework\DB\Adapter\AdapterInterface',
+            \Magento\Framework\DB\Adapter\AdapterInterface::class,
             [],
             '',
             false,
@@ -60,13 +54,7 @@ class ReadEntityRowTest extends \PHPUnit_Framework_TestCase
             ->method('quoteIdentifier')
             ->willReturnArgument(0);
 
-        $metadata = $this->getMock(
-            'Magento\Framework\Model\Entity\EntityMetadata',
-            [],
-            [],
-            '',
-            false
-        );
+        $metadata = $this->createMock(\Magento\Framework\EntityManager\EntityMetadata::class);
 
         $metadata->expects($this->any())
             ->method('getEntityTable')
@@ -80,13 +68,7 @@ class ReadEntityRowTest extends \PHPUnit_Framework_TestCase
             ->method('getIdentifierField')
             ->willReturn('identifier');
 
-        $this->metadataPool = $this->getMock(
-            'Magento\Framework\Model\Entity\MetadataPool',
-            [],
-            [],
-            '',
-            false
-        );
+        $this->metadataPool = $this->createMock(\Magento\Framework\EntityManager\MetadataPool::class);
 
         $this->metadataPool->expects($this->any())
             ->method('getMetadata')

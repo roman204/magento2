@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -9,9 +9,11 @@ namespace Magento\Catalog\Setup;
 use Magento\Framework\Setup\InstallDataInterface;
 use Magento\Framework\Setup\ModuleContextInterface;
 use Magento\Framework\Setup\ModuleDataSetupInterface;
+use Magento\Catalog\Helper\DefaultCategory;
 
 /**
  * @codeCoverageIgnore
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class InstallData implements InstallDataInterface
 {
@@ -21,6 +23,24 @@ class InstallData implements InstallDataInterface
      * @var CategorySetupFactory
      */
     private $categorySetupFactory;
+
+    /**
+     * @var DefaultCategory
+     */
+    private $defaultCategory;
+
+    /**
+     * @deprecated 101.0.0
+     * @return DefaultCategory
+     */
+    private function getDefaultCategory()
+    {
+        if ($this->defaultCategory === null) {
+            $this->defaultCategory = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(DefaultCategory::class);
+        }
+        return $this->defaultCategory;
+    }
 
     /**
      * Init
@@ -42,14 +62,16 @@ class InstallData implements InstallDataInterface
     {
         /** @var \Magento\Catalog\Setup\CategorySetup $categorySetup */
         $categorySetup = $this->categorySetupFactory->create(['setup' => $setup]);
+        $rootCategoryId = \Magento\Catalog\Model\Category::TREE_ROOT_ID;
+        $defaultCategoryId = $this->getDefaultCategory()->getId();
 
         $categorySetup->installEntities();
         // Create Root Catalog Node
         $categorySetup->createCategory()
-            ->load(1)
-            ->setId(1)
+            ->load($rootCategoryId)
+            ->setId($rootCategoryId)
             ->setStoreId(0)
-            ->setPath('1')
+            ->setPath($rootCategoryId)
             ->setLevel(0)
             ->setPosition(0)
             ->setChildrenCount(0)
@@ -57,17 +79,18 @@ class InstallData implements InstallDataInterface
             ->setInitialSetupFlag(true)
             ->save();
 
+        // Create Default Catalog Node
         $category = $categorySetup->createCategory();
-
-        $categorySetup->createCategory()
+        $category->load($defaultCategoryId)
+            ->setId($defaultCategoryId)
             ->setStoreId(0)
-            ->setPath('1')
+            ->setPath($rootCategoryId . '/' . $defaultCategoryId)
             ->setName('Default Category')
             ->setDisplayMode('PRODUCTS')
-            ->setAttributeSetId($category->getDefaultAttributeSetId())
             ->setIsActive(1)
             ->setLevel(1)
             ->setInitialSetupFlag(true)
+            ->setAttributeSetId($category->getDefaultAttributeSetId())
             ->save();
 
         $data = [
@@ -101,7 +124,6 @@ class InstallData implements InstallDataInterface
         // update attributes group and sort
         $attributes = [
             'custom_design' => ['group' => 'design', 'sort' => 10],
-            // 'custom_design_apply' => array('group' => 'design', 'sort' => 20),
             'custom_design_from' => ['group' => 'design', 'sort' => 30],
             'custom_design_to' => ['group' => 'design', 'sort' => 40],
             'page_layout' => ['group' => 'design', 'sort' => 50],
@@ -259,7 +281,7 @@ class InstallData implements InstallDataInterface
                 $newGeneralTabName => 100,
                 'is_required' => 0,
                 'default_value' => 1,
-                'frontend_input_renderer' => 'Magento\Framework\Data\Form\Element\Hidden',
+                'frontend_input_renderer' => \Magento\Framework\Data\Form\Element\Hidden::class,
             ],
             //Autosettings tab
             'short_description' => [$autosettingsTabName => 0, 'is_required' => 0],
@@ -305,13 +327,13 @@ class InstallData implements InstallDataInterface
             \Magento\Catalog\Model\Category::ENTITY,
             'custom_design_from',
             'attribute_model',
-            'Magento\Catalog\Model\ResourceModel\Eav\Attribute'
+            \Magento\Catalog\Model\ResourceModel\Eav\Attribute::class
         );
         $categorySetup->updateAttribute(
             \Magento\Catalog\Model\Category::ENTITY,
             'custom_design_from',
             'frontend_model',
-            'Magento\Eav\Model\Entity\Attribute\Frontend\Datetime'
+            \Magento\Eav\Model\Entity\Attribute\Frontend\Datetime::class
         );
     }
 }

@@ -1,10 +1,12 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Paypal\Block\Express\InContext\Minicart;
 
+use Magento\Checkout\Model\Session;
+use Magento\Payment\Model\MethodInterface;
 use Magento\Paypal\Model\Config;
 use Magento\Paypal\Model\ConfigFactory;
 use Magento\Paypal\Block\Express\InContext;
@@ -24,6 +26,8 @@ class Button extends Template implements ShortcutInterface
 
     const BUTTON_ELEMENT_INDEX = 'button_id';
 
+    const LINK_DATA_ACTION = 'link_data_action';
+
     const CART_BUTTON_ELEMENT_INDEX = 'add_to_cart_selector';
 
     /**
@@ -42,17 +46,29 @@ class Button extends Template implements ShortcutInterface
     private $config;
 
     /**
-     * Constructor
-     *
+     * @var MethodInterface
+     */
+    private $payment;
+
+    /**
+     * @var Session
+     */
+    private $session;
+
+    /**
      * @param Context $context
      * @param ResolverInterface $localeResolver
      * @param ConfigFactory $configFactory
+     * @param MethodInterface $payment
+     * @param Session $session
      * @param array $data
      */
     public function __construct(
         Context $context,
         ResolverInterface $localeResolver,
         ConfigFactory $configFactory,
+        Session $session,
+        MethodInterface $payment,
         array $data = []
     ) {
         parent::__construct($context, $data);
@@ -60,9 +76,13 @@ class Button extends Template implements ShortcutInterface
         $this->localeResolver = $localeResolver;
         $this->config = $configFactory->create();
         $this->config->setMethod(Config::METHOD_EXPRESS);
+        $this->payment = $payment;
+        $this->session = $session;
     }
 
     /**
+     * Check `in_context` config value
+     *
      * @return bool
      */
     private function isInContext()
@@ -71,11 +91,27 @@ class Button extends Template implements ShortcutInterface
     }
 
     /**
+     * Check `visible_on_cart` config value
+     *
+     * @return bool
+     */
+    private function isVisibleOnCart()
+    {
+        return (bool)(int) $this->config->getValue('visible_on_cart');
+    }
+
+    /**
+     * Check is Paypal In-Context Express Checkout button
+     * should render in cart/mini-cart
+     *
      * @return bool
      */
     protected function shouldRender()
     {
-        return $this->isMiniCart && $this->isInContext();
+        return $this->payment->isAvailable($this->session->getQuote())
+            && $this->isMiniCart
+            && $this->isInContext()
+            && $this->isVisibleOnCart();
     }
 
     /**
@@ -96,6 +132,14 @@ class Button extends Template implements ShortcutInterface
     public function getContainerId()
     {
         return $this->getData(self::BUTTON_ELEMENT_INDEX);
+    }
+
+    /**
+     * @return string
+     */
+    public function getLinkAction()
+    {
+        return $this->getData(self::LINK_DATA_ACTION);
     }
 
     /**

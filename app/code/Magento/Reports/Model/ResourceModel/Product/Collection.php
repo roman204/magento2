@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -13,6 +13,8 @@ namespace Magento\Reports\Model\ResourceModel\Product;
 
 /**
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @api
+ * @since 100.0.2
  */
 class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
 {
@@ -82,7 +84,6 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
      * @param \Magento\Customer\Model\Session $customerSession
      * @param \Magento\Framework\Stdlib\DateTime $dateTime
      * @param \Magento\Customer\Api\GroupManagementInterface $groupManagement
-     * @param \Magento\Catalog\Model\ResourceModel\Product\Collection\ProductLimitation $productLimitation
      * @param \Magento\Catalog\Model\ResourceModel\Product $product
      * @param \Magento\Reports\Model\Event\TypeFactory $eventTypeFactory
      * @param \Magento\Catalog\Model\Product\Type $productType
@@ -111,7 +112,6 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
         \Magento\Customer\Model\Session $customerSession,
         \Magento\Framework\Stdlib\DateTime $dateTime,
         \Magento\Customer\Api\GroupManagementInterface $groupManagement,
-        \Magento\Catalog\Model\ResourceModel\Product\Collection\ProductLimitation $productLimitation,
         \Magento\Catalog\Model\ResourceModel\Product $product,
         \Magento\Reports\Model\Event\TypeFactory $eventTypeFactory,
         \Magento\Catalog\Model\Product\Type $productType,
@@ -141,7 +141,6 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
             $customerSession,
             $dateTime,
             $groupManagement,
-            $productLimitation,
             $connection
         );
         $this->_eventTypeFactory = $eventTypeFactory;
@@ -299,7 +298,7 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
     }
 
     /**
-     * Add views count
+     * Add views count.
      *
      * @param string $from
      * @param string $to
@@ -323,10 +322,7 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
             ['views' => 'COUNT(report_table_views.event_id)']
         )->join(
             ['e' => $this->getProductEntityTableName()],
-            $this->getConnection()->quoteInto(
-                'e.entity_id = report_table_views.object_id AND e.attribute_set_id = ?',
-                $this->getProductAttributeSetId()
-            )
+            'e.entity_id = report_table_views.object_id'
         )->where(
             'report_table_views.event_type_id = ?',
             $productViewEvent
@@ -342,6 +338,7 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
         if ($from != '' && $to != '') {
             $this->getSelect()->where('logged_at >= ?', $from)->where('logged_at <= ?', $to);
         }
+
         return $this;
     }
 

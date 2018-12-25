@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Paypal\Controller\Express\AbstractExpress;
@@ -21,10 +21,8 @@ class Start extends GetToken
     public function execute()
     {
         try {
-
             $token = $this->getToken();
             if ($token === null) {
-
                 return;
             }
 

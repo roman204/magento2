@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Framework\Stdlib\Test\Unit;
@@ -8,7 +8,7 @@ namespace Magento\Framework\Stdlib\Test\Unit;
 use Magento\Framework\TestFramework\Unit\Helper\ObjectManager as ObjectManagerHelper;
 use Magento\Framework\Stdlib\ArrayManager;
 
-class ArrayManagerTest extends \PHPUnit_Framework_TestCase
+class ArrayManagerTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var ArrayManager
@@ -139,6 +139,12 @@ class ArrayManagerTest extends \PHPUnit_Framework_TestCase
                 'data' => ['existing' => ['path' => 1]],
                 'value' => 'valuable data',
                 'result' => ['existing' => ['path' => 1], 'new' => ['path' => [2 => 'valuable data']]]
+            ],
+            3 => [
+                'path' => ['new', 'path/2'],
+                'data' => ['existing' => ['path' => 1]],
+                'value' => 'valuable data',
+                'result' => ['existing' => ['path' => 1], 'new' => ['path' => [2 => 'valuable data']]]
             ]
         ];
     }
@@ -178,6 +184,69 @@ class ArrayManagerTest extends \PHPUnit_Framework_TestCase
                 'data' => ['existing' => ['path' => 1]],
                 'value' => 'valuable data',
                 'result' => ['existing' => ['path' => 1]]
+            ],
+            3 => [
+                'path' => ['new', 'path', '2'],
+                'data' => ['existing' => ['path' => 1]],
+                'value' => 'valuable data',
+                'result' => ['existing' => ['path' => 1]]
+            ]
+        ];
+    }
+
+    /**
+     * @param string $path
+     * @param string $targetPath
+     * @param array $data
+     * @param bool $overwrite
+     * @param array $result
+     * @dataProvider moveDataProvider
+     */
+    public function testMove($path, $targetPath, array $data, $overwrite, array $result)
+    {
+        $this->assertSame($result, $this->arrayManager->move($path, $targetPath, $data, $overwrite));
+    }
+
+    /**
+     * @return array
+     */
+    public function moveDataProvider()
+    {
+        return [
+            0 => [
+                'path' => 'not/valid/path',
+                'targetPath' => 'target/path',
+                'data' => ['valid' => ['path' => 'value']],
+                'overwrite' => false,
+                'result' => ['valid' => ['path' => 'value']]
+            ],
+            1 => [
+                'path' => 'valid/path',
+                'targetPath' => 'target/path',
+                'data' => ['valid' => ['path' => 'value']],
+                'overwrite' => false,
+                'result' => ['valid' => [], 'target' => ['path' => 'value']]
+            ],
+            2 => [
+                'path' => 'valid/path',
+                'targetPath' => 'target/path',
+                'data' => ['valid' => ['path' => 'value'], 'target' => ['path' => 'exists']],
+                'overwrite' => false,
+                'result' => ['valid' => ['path' => 'value'], 'target' => ['path' => 'exists']]
+            ],
+            3 => [
+                'path' => 'valid/path',
+                'targetPath' => 'target/path',
+                'data' => ['valid' => ['path' => 'value'], 'target' => ['path' => 'exists']],
+                'overwrite' => true,
+                'result' => ['valid' => [], 'target' => ['path' => 'value']]
+            ],
+            4 => [
+                'path' => ['valid', 'path'],
+                'targetPath' => 'target/path',
+                'data' => ['valid' => ['path' => 'value'], 'target' => ['path' => 'exists']],
+                'overwrite' => true,
+                'result' => ['valid' => [], 'target' => ['path' => 'value']]
             ]
         ];
     }
@@ -217,6 +286,47 @@ class ArrayManagerTest extends \PHPUnit_Framework_TestCase
                 'data' => [],
                 'value' => [true],
                 'result' => []
+            ],
+            3 => [
+                'path' => ['0', 'path/1'],
+                'data' => [['path' => [false, ['value' => false]]]],
+                'value' => ['value' => true, 'new_value' => false],
+                'result' => [['path' => [false, ['value' => true, 'new_value' => false]]]]
+            ],
+        ];
+    }
+
+    /**
+     * @param string $path
+     * @param array $data
+     * @param array $result
+     * @dataProvider populateDataProvider
+     */
+    public function testPopulate($path, $data, $result)
+    {
+        $this->assertSame($result, $this->arrayManager->populate($path, $data));
+    }
+
+    /**
+     * @return array
+     */
+    public function populateDataProvider()
+    {
+        return [
+            0 => [
+                'path' => 'some/is/not/array',
+                'data' => ['some' => true],
+                'result' => ['some' => true]
+            ],
+            1 => [
+                'path' => 0,
+                'data' => [],
+                'result' => [[]]
+            ],
+            2 => [
+                'path' => 'nested/1/array',
+                'data' => ['nested' => [true]],
+                'result' => ['nested' => [true, ['array' => []]]]
             ]
         ];
     }
@@ -252,6 +362,171 @@ class ArrayManagerTest extends \PHPUnit_Framework_TestCase
                 'path' => 'invalid',
                 'data' => [true],
                 'result' => [true]
+            ],
+            3 => [
+                'path' => ['simple'],
+                'data' => ['simple' => true, 'complex' => false],
+                'result' => ['complex' => false]
+            ],
+        ];
+    }
+
+    /**
+     * @param array|mixed $indexes
+     * @param array $data
+     * @param string|array|null $startPath
+     * @param string|array|null $internalPath
+     * @param array $result
+     * @dataProvider findPathsDataProvider
+     */
+    public function testFindPaths($indexes, array $data, $startPath, $internalPath, $result)
+    {
+        $this->assertSame($result, $this->arrayManager->findPaths($indexes, $data, $startPath, $internalPath));
+    }
+
+    /**
+     * @return array
+     */
+    public function findPathsDataProvider()
+    {
+        $data = [
+            'element1' => [
+                'children' => [
+                    'element11' => [
+                        'children' => [true, true]
+                    ],
+                    'element12' => [
+                        'config' => [
+                            'argument' => [
+                                'data' => true
+                            ]
+                        ]
+                    ]
+                ]
+            ],
+            'element2' => [
+                'children' => [true, true, true]
+            ],
+            '' => [
+                [[[[]]]]
+            ]
+        ];
+
+        return [
+            0 => [
+                'indexes' => [0, 2],
+                'data' => $data,
+                'startPath' => 'element2',
+                'internalPath' => null,
+                'result' => ['element2/children/0', 'element2/children/2']
+            ],
+            1 => [
+                'indexes' => 0,
+                'data' => $data,
+                'startPath' => ['', '0'],
+                'internalPath' => '0',
+                'result' => ['/0/0', '/0/0/0/0']
+            ],
+            2 => [
+                'indexes' => 0,
+                'data' => $data,
+                'startPath' => '',
+                'internalPath' => ['0', '0'],
+                'result' => ['/0', '/0/0/0/0']
+            ],
+            3 => [
+                'indexes' => 'data',
+                'data' => $data,
+                'startPath' => 'element1/children',
+                'internalPath' => 'config/argument',
+                'result' => ['element1/children/element12/config/argument/data']
+            ],
+            4 => [
+                'indexes' => 1,
+                'data' => $data,
+                'startPath' => null,
+                'internalPath' => 'elements',
+                'result' => []
+            ]
+        ];
+    }
+
+    /**
+     * @param array|mixed $indexes
+     * @param array $data
+     * @param string|array|null $startPath
+     * @param string|array|null $internalPath
+     * @param array $result
+     * @dataProvider findPathDataProvider
+     */
+    public function testFindPath($indexes, array $data, $startPath, $internalPath, $result)
+    {
+        $this->assertSame($result, $this->arrayManager->findPath($indexes, $data, $startPath, $internalPath));
+    }
+
+    /**
+     * @return array
+     */
+    public function findPathDataProvider()
+    {
+        $data = [
+            'element1' => [
+                'children' => [
+                    'element11' => [
+                        'children' => [true, true]
+                    ],
+                    'element12' => [
+                        'config' => [
+                            'argument' => [
+                                'data' => true
+                            ]
+                        ]
+                    ]
+                ]
+            ],
+            'element2' => [
+                'children' => [true, true, true]
+            ],
+            '' => [
+                [[[[]]]]
+            ]
+        ];
+
+        return [
+            0 => [
+                'indexes' => [0, 2],
+                'data' => $data,
+                'startPath' => 'element2',
+                'internalPath' => null,
+                'result' => 'element2/children/0'
+            ],
+            1 => [
+                'indexes' => 0,
+                'data' => $data,
+                'startPath' => ['', '0'],
+                'internalPath' => '0',
+                'result' => '/0/0'
+            ],
+            2 => [
+                'indexes' => 0,
+                'data' => $data,
+                'startPath' => '',
+                'internalPath' => ['0', '0'],
+                'result' => '/0'
+            ],
+            3 => [
+                'indexes' => 'data',
+                'data' => $data,
+                'startPath' => 'element1/children',
+                'internalPath' => 'config/argument',
+                'result' => 'element1/children/element12/config/argument/data'
+            ],
+            4 => [
+                'indexes' => 1,
+                'data' => $data,
+                'startPath' => null,
+                'internalPath' => 'elements',
+                'result' => null
             ]
         ];
     }
@@ -305,7 +580,7 @@ class ArrayManagerTest extends \PHPUnit_Framework_TestCase
                 'offset' => -6,
                 'length' => 3,
                 'result' => 'path/0/goes'
-            ]
+            ],
         ];
     }
 

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -13,6 +13,6 @@ class ValidateFactory
      */
     public function create()
     {
-        return new \Zend_Validate();
+        return new ExistingValidate();
     }
 }

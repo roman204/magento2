@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\GiftMessage\Ui\DataProvider\Product\Modifier;
@@ -13,6 +13,7 @@ use Magento\GiftMessage\Helper\Message;
 use Magento\Store\Model\ScopeInterface;
 use Magento\Ui\Component\Form\Element\Checkbox;
 use Magento\Ui\Component\Form\Field;
+use Magento\Catalog\Model\Product\Attribute\Source\Boolean;
 
 /**
  * Class GiftMessageDataProvider
@@ -57,13 +58,12 @@ class GiftMessage extends AbstractModifier
     public function modifyData(array $data)
     {
         $modelId = $this->locator->getProduct()->getId();
-        $value = '';
+        $useConfigValue = Boolean::VALUE_USE_CONFIG;
 
-        if (isset($data[$modelId][static::DATA_SOURCE_DEFAULT][static::FIELD_MESSAGE_AVAILABLE])) {
-            $value = $data[$modelId][static::DATA_SOURCE_DEFAULT][static::FIELD_MESSAGE_AVAILABLE];
-        }
+        $isConfigUsed = isset($data[$modelId][static::DATA_SOURCE_DEFAULT][static::FIELD_MESSAGE_AVAILABLE])
+            && $data[$modelId][static::DATA_SOURCE_DEFAULT][static::FIELD_MESSAGE_AVAILABLE] == $useConfigValue;
 
-        if ('' === $value) {
+        if ($isConfigUsed || empty($modelId)) {
             $data[$modelId][static::DATA_SOURCE_DEFAULT][static::FIELD_MESSAGE_AVAILABLE] =
                 $this->getValueFromConfig();
             $data[$modelId][static::DATA_SOURCE_DEFAULT]['use_config_' . static::FIELD_MESSAGE_AVAILABLE] = '1';
@@ -71,7 +71,6 @@ class GiftMessage extends AbstractModifier
 
         return $data;
     }
-
 
     /**
      * {@inheritdoc}
@@ -95,8 +94,13 @@ class GiftMessage extends AbstractModifier
             return $meta;
         }
 
-        $containerPath = $this->getElementArrayPath($meta, 'container_' . static::FIELD_MESSAGE_AVAILABLE);
-        $fieldPath = $this->getElementArrayPath($meta, static::FIELD_MESSAGE_AVAILABLE);
+        $containerPath = $this->arrayManager->findPath(
+            'container_' . static::FIELD_MESSAGE_AVAILABLE,
+            $meta,
+            null,
+            'children'
+        );
+        $fieldPath = $this->arrayManager->findPath(static::FIELD_MESSAGE_AVAILABLE, $meta, null, 'children');
         $groupConfig = $this->arrayManager->get($containerPath, $meta);
         $fieldConfig = $this->arrayManager->get($fieldPath, $meta);
 
@@ -125,14 +129,8 @@ class GiftMessage extends AbstractModifier
                             'data' => [
                                 'config' => [
                                     'dataScope' => static::FIELD_MESSAGE_AVAILABLE,
-                                    'imports' => [
-                                        'disabled' =>
-                                            '${$.parentName}.use_config_'
-                                            . static::FIELD_MESSAGE_AVAILABLE
-                                            . ':checked',
-                                    ],
                                     'additionalClasses' => 'admin__field-x-small',
-                                    'formElement' => Checkbox::NAME,
+                                    'component' => 'Magento_Ui/js/form/element/single-checkbox-use-config',
                                     'componentType' => Field::NAME,
                                     'prefer' => 'toggle',
                                     'valueMap' => [
@@ -156,6 +154,14 @@ class GiftMessage extends AbstractModifier
                                         'false' => '0',
                                         'true' => '1',
                                     ],
+                                    'exports' => [
+                                        'checked' => '${$.parentName}.' . static::FIELD_MESSAGE_AVAILABLE
+                                            . ':isUseConfig',
+                                    ],
+                                    'imports' => [
+                                        'disabled' => '${$.parentName}.' . static::FIELD_MESSAGE_AVAILABLE
+                                            . ':isUseDefault',
+                                    ]
                                 ],
                             ],
                         ],

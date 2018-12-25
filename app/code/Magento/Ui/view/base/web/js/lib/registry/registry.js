@@ -1,7 +1,12 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
+
+/**
+ * @api
+ */
+/* global WeakMap */
 define([
     'jquery',
     'underscore',
@@ -173,6 +178,7 @@ define([
             requests: []
         };
 
+        this._updateRequests = _.debounce(this._updateRequests.bind(this), 10);
         privateData.set(this, data);
     }
 

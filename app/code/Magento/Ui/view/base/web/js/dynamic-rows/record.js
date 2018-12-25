@@ -1,12 +1,16 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/**
+ * @api
+ */
 define([
     'underscore',
-    'uiCollection'
-], function (_, uiCollection) {
+    'uiCollection',
+    'uiRegistry'
+], function (_, uiCollection, registry) {
     'use strict';
 
     return uiCollection.extend({
@@ -27,11 +31,47 @@ define([
                 position: '${ $.name }.${ $.positionProvider }:value'
             },
             exports: {
-                index: '${ $.provider }:${ $.dataScope }.record_id'
+                recordId: '${ $.provider }:${ $.dataScope }.record_id'
             },
             modules: {
                 parentComponent: '${ $.parentName }'
             }
+        },
+
+        /**
+         * Extends instance with default config, calls initialize of parent
+         * class, calls initChildren method, set observe variable.
+         * Use parent "track" method - wrapper observe array
+         *
+         * @returns {Object} Chainable.
+         */
+        initialize: function () {
+            var self = this;
+
+            this._super();
+
+            registry.async(this.name + '.' + this.positionProvider)(function (component) {
+
+                /**
+                 * Overwrite hasChanged method
+                 *
+                 * @returns {Boolean}
+                 */
+                component.hasChanged = function () {
+
+                    /* eslint-disable eqeqeq */
+                    return this.value().toString() != this.initialValue.toString();
+
+                    /* eslint-enable eqeqeq */
+                };
+
+                if (!component.initialValue) {
+                    component.initialValue = self.parentComponent().maxPosition;
+                    component.bubble('update', component.hasChanged());
+                }
+            });
+
+            return this;
         },
 
         /**
@@ -71,9 +111,11 @@ define([
          * @param {Number} position - element position
          */
         initPosition: function (position) {
-            this.parentComponent().setMaxPosition(position, this);
+            var pos = parseInt(position, 10);
 
-            if (!position) {
+            this.parentComponent().setMaxPosition(pos, this);
+
+            if (!pos && pos !== 0) {
                 this.position = this.parentComponent().maxPosition;
             }
         },
@@ -87,11 +129,15 @@ define([
             });
 
             if (!elem) {
-                return false;
+                return;
             }
 
             this.childVisibleListener(elem);
-            !elem.visibleListener ? elem.on('visible', this.childVisibleListener.bind(this, elem)) : false;
+
+            if (!elem.visibleListener) {
+                elem.on('visible', this.childVisibleListener.bind(this, elem));
+            }
+
             elem.visibleListener = true;
         },
 
@@ -223,7 +269,7 @@ define([
          * @param {Boolean} state
          */
         setDisabledColumn: function (index, state) {
-            index = parseInt(index, 10);
+            index = ~~index;
             this.elems()[index].disabled(state);
         }
     });

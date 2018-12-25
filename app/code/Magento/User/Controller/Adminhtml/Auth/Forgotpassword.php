@@ -1,12 +1,23 @@
 <?php
 /**
  *
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\User\Controller\Adminhtml\Auth;
 
-class Forgotpassword extends \Magento\User\Controller\Adminhtml\Auth
+use Magento\Security\Model\SecurityManager;
+use Magento\Framework\App\ObjectManager;
+use Magento\Backend\App\Action\Context;
+use Magento\User\Model\UserFactory;
+use Magento\User\Model\ResourceModel\User\CollectionFactory;
+use Magento\Framework\Validator\EmailAddress;
+use Magento\Security\Model\PasswordResetRequestEvent;
+use Magento\Framework\Exception\SecurityViolationException;
+use Magento\User\Controller\Adminhtml\Auth;
+use Magento\Backend\Helper\Data;
+
+class Forgotpassword extends Auth
 {
     /**
      * @var SecurityManager
@@ -14,67 +25,94 @@ class Forgotpassword extends \Magento\User\Controller\Adminhtml\Auth
     protected $securityManager;
 
     /**
-     * @param \Magento\Backend\App\Action\Context $context
-     * @param \Magento\User\Model\UserFactory $userFactory
-     * @param \Magento\Security\Model\SecurityManager $securityManager
+     * User model factory
+     *
+     * @var CollectionFactory
+     */
+    private $userCollectionFactory;
+
+    /**
+     * @var Data
+     */
+    private $backendDataHelper;
+
+    /**
+     * @param Context $context
+     * @param UserFactory $userFactory
+     * @param SecurityManager $securityManager
+     * @param CollectionFactory $userCollectionFactory
      */
     public function __construct(
-        \Magento\Backend\App\Action\Context $context,
-        \Magento\User\Model\UserFactory $userFactory,
-        \Magento\Security\Model\SecurityManager $securityManager
+        Context $context,
+        UserFactory $userFactory,
+        SecurityManager $securityManager,
+        CollectionFactory $userCollectionFactory = null,
+        Data $backendDataHelper = null
     ) {
         parent::__construct($context, $userFactory);
         $this->securityManager = $securityManager;
+        $this->userCollectionFactory = $userCollectionFactory ?:
+                ObjectManager::getInstance()->get(CollectionFactory::class);
+        $this->backendDataHelper = $backendDataHelper ?:
+                ObjectManager::getInstance()->get(Data::class);
     }
 
     /**
      * Forgot administrator password action
      *
      * @return void
+     * @SuppressWarnings(PHPMD.CyclomaticComplexity)
      */
     public function execute()
     {
         $email = (string)$this->getRequest()->getParam('email');
         $params = $this->getRequest()->getParams();
 
+        /** @var \Magento\Framework\Controller\Result\Redirect $resultRedirect */
+        $resultRedirect = $this->resultRedirectFactory->create();
         if (!empty($email) && !empty($params)) {
             // Validate received data to be an email address
-            if (\Zend_Validate::is($email, 'EmailAddress')) {
+            if (\Zend_Validate::is($email, EmailAddress::class)) {
                 try {
                     $this->securityManager->performSecurityCheck(
-                        \Magento\Security\Model\PasswordResetRequestEvent::ADMIN_PASSWORD_RESET_REQUEST,
+                        PasswordResetRequestEvent::ADMIN_PASSWORD_RESET_REQUEST,
                         $email
                     );
-                } catch (\Magento\Framework\Exception\SecurityViolationException $exception) {
+                } catch (SecurityViolationException $exception) {
                     $this->messageManager->addErrorMessage($exception->getMessage());
-                    $resultRedirect = $this->resultRedirectFactory->create();
                     return $resultRedirect->setPath('admin');
                 }
-                $collection = $this->_objectManager->get('Magento\User\Model\ResourceModel\User\Collection');
                 /** @var $collection \Magento\User\Model\ResourceModel\User\Collection */
+                $collection = $this->userCollectionFactory->create();
                 $collection->addFieldToFilter('email', $email);
                 $collection->load(false);
 
-                if ($collection->getSize() > 0) {
-                    foreach ($collection as $item) {
-                        /** @var \Magento\User\Model\User $user */
-                        $user = $this->_userFactory->create()->load($item->getId());
-                        if ($user->getId()) {
-                            $newPassResetToken = $this->_objectManager->get(
-                                'Magento\User\Helper\Data'
-                            )->generateResetPasswordLinkToken();
-                            $user->changeResetPasswordLinkToken($newPassResetToken);
-                            $user->save();
-                            $user->sendPasswordResetConfirmationEmail();
+                try {
+                    if ($collection->getSize() > 0) {
+                        foreach ($collection as $item) {
+                            /** @var \Magento\User\Model\User $user */
+                            $user = $this->_userFactory->create()->load($item->getId());
+                            if ($user->getId()) {
+                                $newPassResetToken = $this->backendDataHelper->generateResetPasswordLinkToken();
+                                $user->changeResetPasswordLinkToken($newPassResetToken);
+                                $user->save();
+                                $user->sendPasswordResetConfirmationEmail();
+                            }
+                            break;
                         }
-                        break;
                     }
+                } catch (\Exception $exception) {
+                    $this->messageManager->addExceptionMessage(
+                        $exception,
+                        __('We\'re unable to send the password reset email.')
+                    );
+                    return $resultRedirect->setPath('admin');
                 }
                 // @codingStandardsIgnoreStart
                 $this->messageManager->addSuccess(__('We\'ll email you a link to reset your password.'));
                 // @codingStandardsIgnoreEnd
                 $this->getResponse()->setRedirect(
-                    $this->_objectManager->get('Magento\Backend\Helper\Data')->getHomePageUrl()
+                    $this->backendDataHelper->getHomePageUrl()
                 );
                 return;
             } else {

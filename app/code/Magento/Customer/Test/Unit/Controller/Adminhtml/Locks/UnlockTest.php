@@ -1,22 +1,19 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
 namespace Magento\Customer\Test\Unit\Controller\Adminhtml\Locks;
 
+use Magento\Customer\Model\AuthenticationInterface;
 use Magento\Framework\TestFramework\Unit\Helper\ObjectManager;
-use Magento\Framework\DataObject;
-use Magento\Framework\Phrase;
-use Magento\Framework\Validator\Exception;
 
 /**
  * Test class for \Magento\Customer\Controller\Adminhtml\Locks\Unlock testing
  *
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
-class UnlockTest extends \PHPUnit_Framework_TestCase
+class UnlockTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\Backend\App\Action\Context
@@ -24,11 +21,11 @@ class UnlockTest extends \PHPUnit_Framework_TestCase
     protected $contextMock;
 
     /**
-     * Account manager
+     * Authentication
      *
-     * @var \Magento\Customer\Helper\AccountManagement
+     * @var AuthenticationInterface
      */
-    protected $accountManagementHelperMock;
+    protected $authenticationMock;
 
     /**
      * @var  \Magento\Framework\TestFramework\Unit\Helper\ObjectManager
@@ -56,11 +53,6 @@ class UnlockTest extends \PHPUnit_Framework_TestCase
     protected $redirectMock;
 
     /**
-     * @var \Magento\Customer\Model\ResourceModel\CustomerRepository
-     */
-    protected $customerRepositoryMock;
-
-    /**
      * @var \Magento\Customer\Model\Data\Customer
      */
     protected $customerDataMock;
@@ -77,52 +69,28 @@ class UnlockTest extends \PHPUnit_Framework_TestCase
     public function setUp()
     {
         $this->objectManager = new ObjectManager($this);
-        $this->contextMock = $this->getMockBuilder('\Magento\Backend\App\Action\Context')
+        $this->contextMock = $this->getMockBuilder(\Magento\Backend\App\Action\Context::class)
             ->disableOriginalConstructor()
             ->getMock();
-        $this->accountManagementHelperMock = $this->getMock(
-            'Magento\Customer\Helper\AccountManagement',
-            ['processUnlockData'],
-            [],
-            '',
-            false
-        );
-        $this->requestMock = $this->getMockBuilder('Magento\Framework\App\RequestInterface')
+        $this->authenticationMock = $this->getMockBuilder(AuthenticationInterface::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+
+        $this->requestMock = $this->getMockBuilder(\Magento\Framework\App\RequestInterface::class)
             ->setMethods(['getParam'])
             ->getMockForAbstractClass();
-        $this->messageManagerMock = $this->getMock('Magento\Framework\Message\ManagerInterface');
-        $this->resultFactoryMock = $this->getMock(
-            'Magento\Framework\Controller\ResultFactory',
-            ['create'],
-            [],
-            '',
-            false
+        $this->messageManagerMock = $this->createMock(\Magento\Framework\Message\ManagerInterface::class);
+        $this->resultFactoryMock = $this->createPartialMock(
+            \Magento\Framework\Controller\ResultFactory::class,
+            ['create']
         );
-        $this->redirectMock = $this->getMock(
-            'Magento\Backend\Model\View\Result\Redirect',
-            ['setPath'],
-            [],
-            '',
-            false
-        );
-        $this->customerDataMock = $this->getMock(
-            'Magento\Customer\Model\Data\Customer',
-            [],
-            [],
-            '',
-            false
-        );
-        $this->contextMock = $this->getMockBuilder('Magento\Backend\App\Action\Context')
+        $this->redirectMock = $this->createPartialMock(\Magento\Backend\Model\View\Result\Redirect::class, ['setPath']);
+        $this->customerDataMock = $this->createMock(\Magento\Customer\Model\Data\Customer::class);
+        $this->contextMock = $this->getMockBuilder(\Magento\Backend\App\Action\Context::class)
             ->setMethods(['getObjectManager', 'getResultFactory', 'getMessageManager', 'getRequest'])
             ->disableOriginalConstructor()
             ->getMock();
-        $this->customerRepositoryMock = $this->getMock(
-            'Magento\Customer\Model\ResourceModel\CustomerRepository',
-            ['getById', 'save'],
-            [],
-            '',
-            false
-        );
+
         $this->contextMock->expects($this->any())
             ->method('getRequest')
             ->willReturn($this->requestMock);
@@ -131,11 +99,10 @@ class UnlockTest extends \PHPUnit_Framework_TestCase
         $this->resultFactoryMock->expects($this->once())->method('create')->willReturn($this->redirectMock);
 
         $this->controller = $this->objectManager->getObject(
-            '\Magento\Customer\Controller\Adminhtml\Locks\Unlock',
+            \Magento\Customer\Controller\Adminhtml\Locks\Unlock::class,
             [
                 'context' => $this->contextMock,
-                'accountManagementHelper' => $this->accountManagementHelperMock,
-                'customerRepository' => $this->customerRepositoryMock
+                'authentication' => $this->authenticationMock,
             ]
         );
     }
@@ -150,18 +117,13 @@ class UnlockTest extends \PHPUnit_Framework_TestCase
             ->method('getParam')
             ->with($this->equalTo('customer_id'))
             ->will($this->returnValue($customerId));
-        $this->customerRepositoryMock->expects($this->once())
-            ->method('getById')
-            ->with($customerId)
-            ->willReturn($this->customerDataMock);
-        $this->accountManagementHelperMock->expects($this->once())->method('processUnlockData')->with($customerId);
-        $this->customerRepositoryMock->expects($this->once())->method('save')->with($this->customerDataMock);
+        $this->authenticationMock->expects($this->once())->method('unlock')->with($customerId);
         $this->messageManagerMock->expects($this->once())->method('addSuccess');
         $this->redirectMock->expects($this->once())
             ->method('setPath')
             ->with($this->equalTo('customer/index/edit'))
             ->willReturnSelf();
-        $this->assertInstanceOf('\Magento\Backend\Model\View\Result\Redirect', $this->controller->execute());
+        $this->assertInstanceOf(\Magento\Backend\Model\View\Result\Redirect::class, $this->controller->execute());
     }
 
     /**
@@ -175,12 +137,8 @@ class UnlockTest extends \PHPUnit_Framework_TestCase
             ->method('getParam')
             ->with($this->equalTo('customer_id'))
             ->will($this->returnValue($customerId));
-        $this->customerRepositoryMock->expects($this->once())
-            ->method('getById')
-            ->with($customerId)
-            ->willReturn($this->customerDataMock);
-        $this->accountManagementHelperMock->expects($this->once())
-            ->method('processUnlockData')
+        $this->authenticationMock->expects($this->once())
+            ->method('unlock')
             ->with($customerId)
             ->willThrowException(new \Exception($phrase));
         $this->messageManagerMock->expects($this->once())->method('addError');

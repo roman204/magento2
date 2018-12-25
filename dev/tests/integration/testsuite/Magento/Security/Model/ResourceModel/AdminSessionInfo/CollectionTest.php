@@ -1,12 +1,14 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 namespace Magento\Security\Model\ResourceModel\AdminSessionInfo;
 
-class CollectionTest extends \PHPUnit_Framework_TestCase
+use Magento\Framework\Stdlib\DateTime\DateTime;
+
+class CollectionTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\Security\Model\ResourceModel\AdminSessionInfo\Collection
@@ -25,7 +27,7 @@ class CollectionTest extends \PHPUnit_Framework_TestCase
     {
         $this->objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
         $this->collectionModel = $this->objectManager
-            ->create('Magento\Security\Model\ResourceModel\AdminSessionInfo\Collection');
+            ->create(\Magento\Security\Model\ResourceModel\AdminSessionInfo\Collection::class);
     }
 
     /**
@@ -67,9 +69,9 @@ class CollectionTest extends \PHPUnit_Framework_TestCase
     public function testFilterExpiredSessions()
     {
         $startTime = strtotime('2016-01-19 15:42:13') - 1;
-        $securityConfig = $this->objectManager
-            ->create('\Magento\Security\Helper\SecurityConfig');
-        $currentTime = $securityConfig->getCurrentTimestamp();
+        $dateTime = $this->objectManager
+            ->get(DateTime::class);
+        $currentTime = $dateTime->gmtTimestamp();
         $sessionLifetime = $currentTime - $startTime;
 
         $this->collectionModel->filterExpiredSessions($sessionLifetime);

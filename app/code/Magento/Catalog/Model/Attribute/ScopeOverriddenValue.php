@@ -1,12 +1,12 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 namespace Magento\Catalog\Model\Attribute;
 
-use Magento\Framework\Model\Entity\MetadataPool;
+use Magento\Framework\EntityManager\MetadataPool;
 use Magento\Eav\Api\AttributeRepositoryInterface as AttributeRepository;
 use Magento\Framework\Api\SearchCriteriaBuilder;
 use Magento\Framework\Api\FilterBuilder;
@@ -96,7 +96,7 @@ class ScopeOverriddenValue
      * @param \Magento\Catalog\Model\AbstractModel $entity
      * @return array
      *
-     * @deprecated
+     * @deprecated 101.0.0
      */
     public function getDefaultValues($entityType, $entity)
     {
@@ -140,7 +140,7 @@ class ScopeOverriddenValue
                         'a.attribute_id = t.attribute_id',
                         ['attribute_code' => 'a.attribute_code']
                     )
-                    ->where($metadata->getLinkField() . ' = ?', $entity->getId())
+                    ->where($metadata->getLinkField() . ' = ?', $entity->getData($metadata->getLinkField()))
                     ->where('t.attribute_id IN (?)', $attributeCodes)
                     ->where('t.store_id IN (?)', $storeIds);
                 $selects[] = $select;

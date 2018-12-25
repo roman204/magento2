@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Backend\Block\System\Store\Edit\Form;
@@ -92,7 +92,7 @@ class Website extends \Magento\Backend\Block\System\Store\Edit\AbstractForm
         if ($this->_coreRegistry->registry('store_action') == 'edit') {
             $groups = $this->_groupFactory->create()->getCollection()->addWebsiteFilter(
                 $websiteModel->getId()
-            )->setWithoutStoreViewFilter()->toOptionArray();
+            )->toOptionArray();
 
             $fieldset->addField(
                 'website_default_group_id',

@@ -1,8 +1,11 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/**
+ * @api
+ */
 define([
     './insert',
     'mageUtils',
@@ -14,41 +17,50 @@ define([
      * Get page actions element.
      *
      * @param {String} elem
-     * @param {String} actionsSelector
+     * @param {String} actionsClass
      * @returns {String}
      */
-    function getPageActions(elem, actionsSelector) {
-        var $el = $('<div/>').html(elem),
-            $wrapper = $('<div/>').addClass('page-main-actions');
+    function getPageActions(elem, actionsClass) {
+        var el = document.createElement('div');
 
-        return $wrapper.html($el.find(actionsSelector)).get(0).outerHTML;
+        el.innerHTML = elem;
+
+        return el.getElementsByClassName(actionsClass)[0];
     }
 
     /**
      * Return element without page actions toolbar
      *
      * @param {String} elem
-     * @param {String} actionsSelector
+     * @param {String} actionsClass
      * @returns {String}
      */
-    function removePageActions(elem, actionsSelector) {
-        var $el = $('<div/>').html(elem);
+    function removePageActions(elem, actionsClass) {
+        var el = document.createElement('div'),
+            actions;
 
-        $el.find(actionsSelector).remove();
+        el.innerHTML = elem;
+        actions = el.getElementsByClassName(actionsClass)[0];
 
-        return $el.html();
+        if (actions) {
+            el.removeChild(actions);
+        }
+
+        return el.innerHTML;
     }
 
     return Insert.extend({
         defaults: {
             externalFormName: '${ $.ns }.${ $.ns }',
-            pageActionsSelector: '.page-actions',
+            pageActionsClass: 'page-actions',
+            actionsContainerClass: 'page-main-actions',
             exports: {
                 prefix: '${ $.externalFormName }:selectorPrefix'
             },
             imports: {
                 toolbarSection: '${ $.toolbarContainer }:toolbarSection',
-                prefix: '${ $.toolbarContainer }:rootSelector'
+                prefix: '${ $.toolbarContainer }:rootSelector',
+                messagesClass: '${ $.externalFormName }:messagesClass'
             },
             settings: {
                 ajax: {
@@ -84,8 +96,8 @@ define([
 
         /** @inheritdoc*/
         destroyInserted: function () {
-            if (this.isRendered) {
-                this.externalForm().destroy();
+            if (this.isRendered && this.externalForm()) {
+                this.externalForm().delegate('destroy');
                 this.removeActions();
                 this.responseStatus(undefined);
                 this.responseData = {};
@@ -96,12 +108,12 @@ define([
 
         /** @inheritdoc */
         onRender: function (data) {
-            var actions = getPageActions(data, this.pageActionsSelector);
+            var actions = getPageActions(data, this.pageActionsClass);
 
             if (!data.length) {
                 return this;
             }
-            data = removePageActions(data, this.pageActionsSelector);
+            data = removePageActions(data, this.pageActionsClass);
             this.renderActions(actions);
             this._super(data);
         },
@@ -109,17 +121,25 @@ define([
         /**
          * Insert actions in toolbar.
          *
-         * @param {String} elem
+         * @param {String} actions
          */
-        renderActions: function (elem) {
-            this.formHeader = $(elem);
+        renderActions: function (actions) {
+            var $container = $('<div/>');
+
+            $container
+                .addClass(this.actionsContainerClass)
+                .append(actions);
+
+            this.formHeader = $container;
+
             $(this.toolbarSection).append(this.formHeader);
         },
 
         /**
-         * Remove actions tollbar.
+         * Remove actions toolbar.
          */
         removeActions: function () {
+            $(this.formHeader).siblings('.' + this.messagesClass).remove();
             $(this.formHeader).remove();
             this.formHeader = $();
         },

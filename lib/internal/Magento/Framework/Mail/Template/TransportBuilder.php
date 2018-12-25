@@ -2,18 +2,22 @@
 /**
  * Mail Template Transport Builder
  *
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 namespace Magento\Framework\Mail\Template;
 
 use Magento\Framework\App\TemplateTypesInterface;
-use Magento\Framework\Mail\Message;
 use Magento\Framework\Mail\MessageInterface;
+use Magento\Framework\Mail\MessageInterfaceFactory;
+use Magento\Framework\Mail\TransportInterface;
 use Magento\Framework\Mail\TransportInterfaceFactory;
 use Magento\Framework\ObjectManagerInterface;
 
+/**
+ * @api
+ */
 class TransportBuilder
 {
     /**
@@ -47,7 +51,7 @@ class TransportBuilder
     /**
      * Mail Transport
      *
-     * @var \Magento\Framework\Mail\TransportInterface
+     * @var TransportInterface
      */
     protected $transport;
 
@@ -61,28 +65,33 @@ class TransportBuilder
     /**
      * Object Manager
      *
-     * @var \Magento\Framework\ObjectManagerInterface
+     * @var ObjectManagerInterface
      */
     protected $objectManager;
 
     /**
      * Message
      *
-     * @var \Magento\Framework\Mail\Message
+     * @var MessageInterface
      */
     protected $message;
 
     /**
      * Sender resolver
      *
-     * @var \Magento\Framework\Mail\Template\SenderResolverInterface
+     * @var SenderResolverInterface
      */
     protected $_senderResolver;
 
     /**
-     * @var \Magento\Framework\Mail\TransportInterfaceFactory
+     * @var TransportInterfaceFactory
      */
     protected $mailTransportFactory;
+
+    /**
+     * @var MessageInterfaceFactory
+     */
+    private $messageFactory;
 
     /**
      * @param FactoryInterface $templateFactory
@@ -90,19 +99,24 @@ class TransportBuilder
      * @param SenderResolverInterface $senderResolver
      * @param ObjectManagerInterface $objectManager
      * @param TransportInterfaceFactory $mailTransportFactory
+     * @param MessageInterfaceFactory|null $messageFactory
+     *
+     * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
     public function __construct(
         FactoryInterface $templateFactory,
         MessageInterface $message,
         SenderResolverInterface $senderResolver,
         ObjectManagerInterface $objectManager,
-        TransportInterfaceFactory $mailTransportFactory
+        TransportInterfaceFactory $mailTransportFactory,
+        MessageInterfaceFactory $messageFactory = null
     ) {
         $this->templateFactory = $templateFactory;
-        $this->message = $message;
         $this->objectManager = $objectManager;
         $this->_senderResolver = $senderResolver;
         $this->mailTransportFactory = $mailTransportFactory;
+        $this->messageFactory = $messageFactory ?: $this->objectManager->get(MessageInterfaceFactory::class);
+        $this->message = $this->messageFactory->create();
     }
 
     /**
@@ -220,7 +234,7 @@ class TransportBuilder
     /**
      * Get mail transport
      *
-     * @return \Magento\Framework\Mail\TransportInterface
+     * @return TransportInterface
      */
     public function getTransport()
     {
@@ -238,7 +252,7 @@ class TransportBuilder
      */
     protected function reset()
     {
-        $this->message = $this->objectManager->create('Magento\Framework\Mail\Message');
+        $this->message = $this->messageFactory->create();
         $this->templateIdentifier = null;
         $this->templateVars = null;
         $this->templateOptions = null;
@@ -273,7 +287,7 @@ class TransportBuilder
         $body = $template->processTemplate();
         $this->message->setMessageType($types[$template->getType()])
             ->setBody($body)
-            ->setSubject($template->getSubject());
+            ->setSubject(html_entity_decode($template->getSubject(), ENT_QUOTES));
 
         return $this;
     }

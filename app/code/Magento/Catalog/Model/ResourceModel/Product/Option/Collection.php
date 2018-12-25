@@ -1,28 +1,33 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\ResourceModel\Product\Option;
 
 use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Framework\Api\ExtensionAttribute\JoinProcessorInterface;
+use Magento\Framework\EntityManager\MetadataPool;
 
 /**
  * Catalog product options collection
  *
+ * @api
  * @SuppressWarnings(PHPMD.LongVariable)
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
 class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection
 {
     /**
      * @var JoinProcessorInterface
+     * @since 101.0.0
      */
     protected $joinProcessor;
 
     /**
-     * @var \Magento\Framework\Model\Entity\MetadataPool
+     * @var \Magento\Framework\EntityManager\MetadataPool
+     * @since 101.0.0
      */
     protected $metadataPool;
 
@@ -47,10 +52,9 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
      * @param \Magento\Framework\Event\ManagerInterface $eventManager
      * @param \Magento\Catalog\Model\ResourceModel\Product\Option\Value\CollectionFactory $optionValueCollectionFactory
      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Framework\Model\Entity\MetadataPool $metadataPool
-     * @param JoinProcessorInterface $joinProcessor
      * @param \Magento\Framework\DB\Adapter\AdapterInterface $connection
      * @param \Magento\Framework\Model\ResourceModel\Db\AbstractDb $resource
+     * @param MetadataPool $metadataPool
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
@@ -60,15 +64,14 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
         \Magento\Framework\Event\ManagerInterface $eventManager,
         \Magento\Catalog\Model\ResourceModel\Product\Option\Value\CollectionFactory $optionValueCollectionFactory,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
-        \Magento\Framework\Model\Entity\MetadataPool $metadataPool,
-        JoinProcessorInterface $joinProcessor,
         \Magento\Framework\DB\Adapter\AdapterInterface $connection = null,
-        \Magento\Framework\Model\ResourceModel\Db\AbstractDb $resource = null
+        \Magento\Framework\Model\ResourceModel\Db\AbstractDb $resource = null,
+        MetadataPool $metadataPool = null
     ) {
         $this->_optionValueCollectionFactory = $optionValueCollectionFactory;
         $this->_storeManager = $storeManager;
-        $this->metadataPool = $metadataPool;
-        $this->joinProcessor = $joinProcessor;
+        $this->metadataPool = $metadataPool ?: \Magento\Framework\App\ObjectManager::getInstance()
+            ->get(\Magento\Framework\EntityManager\MetadataPool::class);
         parent::__construct($entityFactory, $logger, $fetchStrategy, $eventManager, $connection, $resource);
     }
 
@@ -79,7 +82,10 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
      */
     protected function _construct()
     {
-        $this->_init('Magento\Catalog\Model\Product\Option', 'Magento\Catalog\Model\ResourceModel\Product\Option');
+        $this->_init(
+            \Magento\Catalog\Model\Product\Option::class,
+            \Magento\Catalog\Model\ResourceModel\Product\Option::class
+        );
     }
 
     /**
@@ -243,6 +249,7 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     /**
      * @return void
      * @throws \Exception
+     * @since 101.0.0
      */
     protected function _initSelect()
     {
@@ -262,6 +269,7 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
      * @param int $storeId
      * @param bool $requiredOnly
      * @return \Magento\Catalog\Api\Data\ProductCustomOptionInterface[]
+     * @since 101.0.0
      */
     public function getProductOptions($productId, $storeId, $requiredOnly = false)
     {
@@ -283,7 +291,7 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
             $collection->addRequiredFilter();
         }
         $collection->addValuesToResult($storeId);
-        $this->joinProcessor->process($collection);
+        $this->getJoinProcessor()->process($collection);
         return $collection->getItems();
     }
 
@@ -319,5 +327,17 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     public function reset()
     {
         return $this->_reset();
+    }
+
+    /**
+     * @return JoinProcessorInterface
+     */
+    private function getJoinProcessor()
+    {
+        if (null === $this->joinProcessor) {
+            $this->joinProcessor = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\Api\ExtensionAttribute\JoinProcessorInterface::class);
+        }
+        return $this->joinProcessor;
     }
 }

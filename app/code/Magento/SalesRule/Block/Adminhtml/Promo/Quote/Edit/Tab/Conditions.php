@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\SalesRule\Block\Adminhtml\Promo\Quote\Edit\Tab;
@@ -33,7 +33,7 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
     private $ruleFactory;
 
     /**
-     * Initialize dependencies.
+     * Constructor
      *
      * @param \Magento\Backend\Block\Template\Context $context
      * @param \Magento\Framework\Registry $registry
@@ -41,6 +41,7 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
      * @param \Magento\Rule\Block\Conditions $conditions
      * @param \Magento\Backend\Block\Widget\Form\Renderer\Fieldset $rendererFieldset
      * @param array $data
+     * @param \Magento\SalesRule\Model\RuleFactory|null $ruleFactory
      */
     public function __construct(
         \Magento\Backend\Block\Template\Context $context,
@@ -48,22 +49,14 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
         \Magento\Framework\Data\FormFactory $formFactory,
         \Magento\Rule\Block\Conditions $conditions,
         \Magento\Backend\Block\Widget\Form\Renderer\Fieldset $rendererFieldset,
-        array $data = []
+        array $data = [],
+        \Magento\SalesRule\Model\RuleFactory $ruleFactory = null
     ) {
         $this->_rendererFieldset = $rendererFieldset;
         $this->_conditions = $conditions;
+        $this->ruleFactory = $ruleFactory ?: ObjectManager::getInstance()
+            ->get(\Magento\SalesRule\Model\RuleFactory::class);
         parent::__construct($context, $registry, $formFactory, $data);
-    }
-
-    /**
-     * @return \Magento\SalesRule\Model\RuleFactory
-     * @deprecated
-     */
-    public function getRuleFactory()
-    {
-        if ($this->ruleFactory instanceof \Magento\SalesRule\Model\RuleFactory) {
-            $this->ruleFactory = ObjectManager::getInstance()->get('\Magento\SalesRule\Model\RuleFactory');
-        }
     }
 
     /**
@@ -77,7 +70,6 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
 
     /**
      * {@inheritdoc}
-     * @codeCoverageIgnore
      */
     public function getTabUrl()
     {
@@ -86,7 +78,6 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
 
     /**
      * {@inheritdoc}
-     * @codeCoverageIgnore
      */
     public function isAjaxLoaded()
     {
@@ -95,7 +86,6 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
 
     /**
      * {@inheritdoc}
-     * @codeCoverageIgnore
      */
     public function getTabLabel()
     {
@@ -104,7 +94,6 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
 
     /**
      * {@inheritdoc}
-     * @codeCoverageIgnore
      */
     public function getTabTitle()
     {
@@ -113,7 +102,6 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
 
     /**
      * {@inheritdoc}
-     * @codeCoverageIgnore
      */
     public function canShowTab()
     {
@@ -122,7 +110,6 @@ class Conditions extends \Magento\Backend\Block\Widget\Form\Generic implements
 
     /**
      * {@inheritdoc}
-     * @codeCoverageIgnore
      */
     public function isHidden()
     {

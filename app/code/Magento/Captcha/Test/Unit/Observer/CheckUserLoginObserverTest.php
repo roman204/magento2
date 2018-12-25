@@ -1,37 +1,40 @@
 <?php
 /**
- * Copyright © 2016 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Captcha\Test\Unit\Observer;
 
-use Zend\Server\Reflection\ReflectionMethod;
+use Magento\Customer\Model\AuthenticationInterface;
 
-class CheckUserLoginObserverTest extends \PHPUnit_Framework_TestCase
+/**
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
+class CheckUserLoginObserverTest extends \PHPUnit\Framework\TestCase
 {
-    /** @var \Magento\Captcha\Helper\Data |\PHPUnit_Framework_MockObject_MockObject */
+    /** @var \Magento\Captcha\Helper\Data|\PHPUnit_Framework_MockObject_MockObject */
     protected $helperMock;
 
-    /** @var \Magento\Framework\App\ActionFlag |\PHPUnit_Framework_MockObject_MockObject */
+    /** @var \Magento\Framework\App\ActionFlag|\PHPUnit_Framework_MockObject_MockObject */
     protected $actionFlagMock;
 
-    /* @var \Magento\Framework\Message\ManagerInterface |\PHPUnit_Framework_MockObject_MockObject */
+    /* @var \Magento\Framework\Message\ManagerInterface|\PHPUnit_Framework_MockObject_MockObject */
     protected $messageManagerMock;
 
-    /** @var \Magento\Customer\Model\Session |\PHPUnit_Framework_MockObject_MockObject */
+    /** @var \Magento\Customer\Model\Session|\PHPUnit_Framework_MockObject_MockObject */
     protected $customerSessionMock;
 
-    /** @var \Magento\Captcha\Observer\CaptchaStringResolver |\PHPUnit_Framework_MockObject_MockObject */
+    /** @var \Magento\Captcha\Observer\CaptchaStringResolver|\PHPUnit_Framework_MockObject_MockObject */
     protected $captchaStringResolverMock;
 
-    /** @var \Magento\Customer\Model\Url |\PHPUnit_Framework_MockObject_MockObject */
+    /** @var \Magento\Customer\Model\Url|\PHPUnit_Framework_MockObject_MockObject */
     protected $customerUrlMock;
 
-    /** @var \Magento\Customer\Api\CustomerRepositoryInterface |\PHPUnit_Framework_MockObject_MockObject */
+    /** @var \Magento\Customer\Api\CustomerRepositoryInterface|\PHPUnit_Framework_MockObject_MockObject */
     protected $customerRepositoryMock;
 
-    /** @var \Magento\Customer\Helper\AccountManagement |\PHPUnit_Framework_MockObject_MockObject */
-    protected $accountManagementHelperMock;
+    /** @var AuthenticationInterface|\PHPUnit_Framework_MockObject_MockObject */
+    protected $authenticationMock;
 
     /** @var \Magento\Captcha\Observer\CheckUserLoginObserver */
     protected $observer;
@@ -42,54 +45,21 @@ class CheckUserLoginObserverTest extends \PHPUnit_Framework_TestCase
      */
     protected function setUp()
     {
-        $this->helperMock = $this->getMock('\Magento\Captcha\Helper\Data', [], [], '', false);
-        $this->actionFlagMock = $this->getMock('\Magento\Framework\App\ActionFlag', [], [], '', false);
-        $this->messageManagerMock = $this->getMock(
-            '\Magento\Framework\Message\ManagerInterface',
-            [],
-            [],
-            '',
-            false
+        $this->helperMock = $this->createMock(\Magento\Captcha\Helper\Data::class);
+        $this->actionFlagMock = $this->createMock(\Magento\Framework\App\ActionFlag::class);
+        $this->messageManagerMock = $this->createMock(\Magento\Framework\Message\ManagerInterface::class);
+        $this->customerSessionMock = $this->createPartialMock(
+            \Magento\Customer\Model\Session::class,
+            ['setUsername', 'getBeforeAuthUrl']
         );
-        $this->customerSessionMock = $this->getMock(
-            '\Magento\Customer\Model\Session',
-            ['setUsername', 'getBeforeAuthUrl'],
-            [],
-            '',
-            false
-        );
-        $this->captchaStringResolverMock = $this->getMock(
-            '\Magento\Captcha\Observer\CaptchaStringResolver',
-            [],
-            [],
-            '',
-            false
-        );
-        $this->customerUrlMock = $this->getMock(
-            '\Magento\Customer\Model\Url',
-            [],
-            [],
-            '',
-            false
-        );
-        $this->customerRepositoryMock = $this->getMock(
-            '\Magento\Customer\Api\CustomerRepositoryInterface',
-            [],
-            [],
-            '',
-            false
-        );
-        $this->accountManagementHelperMock = $this->getMock(
-            '\Magento\Customer\Helper\AccountManagement',
-            [],
-            [],
-            '',
-            false
-        );
+        $this->captchaStringResolverMock = $this->createMock(\Magento\Captcha\Observer\CaptchaStringResolver::class);
+        $this->customerUrlMock = $this->createMock(\Magento\Customer\Model\Url::class);
+        $this->customerRepositoryMock = $this->createMock(\Magento\Customer\Api\CustomerRepositoryInterface::class);
+        $this->authenticationMock = $this->createMock(AuthenticationInterface::class);
 
         $objectManager = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
         $this->observer = $objectManager->getObject(
-            'Magento\Captcha\Observer\CheckUserLoginObserver',
+            \Magento\Captcha\Observer\CheckUserLoginObserver::class,
             [
                 'helper' => $this->helperMock,
                 'actionFlag' => $this->actionFlagMock,
@@ -100,19 +70,14 @@ class CheckUserLoginObserverTest extends \PHPUnit_Framework_TestCase
             ]
         );
 
-        $methodSetAccountManagementHelper = new \ReflectionMethod(
-            'Magento\Captcha\Observer\CheckUserLoginObserver',
-            'setAccountManagementHelper'
-        );
-        $methodSetAccountManagementHelper->setAccessible(true);
-        $methodSetAccountManagementHelper->invoke($this->observer, $this->accountManagementHelperMock);
+        $reflection = new \ReflectionClass(get_class($this->observer));
+        $reflectionProperty = $reflection->getProperty('authentication');
+        $reflectionProperty->setAccessible(true);
+        $reflectionProperty->setValue($this->observer, $this->authenticationMock);
 
-        $methodSetCustomerRepository = new \ReflectionMethod(
-            'Magento\Captcha\Observer\CheckUserLoginObserver',
-            'setCustomerRepository'
-        );
-        $methodSetCustomerRepository->setAccessible(true);
-        $methodSetCustomerRepository->invoke($this->observer, $this->customerRepositoryMock);
+        $reflectionProperty2 = $reflection->getProperty('customerRepository');
+        $reflectionProperty2->setAccessible(true);
+        $reflectionProperty2->setValue($this->observer, $this->customerRepositoryMock);
     }
 
     /**
@@ -127,7 +92,7 @@ class CheckUserLoginObserverTest extends \PHPUnit_Framework_TestCase
         $redirectUrl = 'http://magento.com/customer/account/login/';
         $captchaValue = 'some-value';
 
-        $captcha = $this->getMock('Magento\Captcha\Model\DefaultModel', [], [], '', false);
+        $captcha = $this->createMock(\Magento\Captcha\Model\DefaultModel::class);
         $captcha->expects($this->once())
             ->method('isRequired')
             ->with($login)
@@ -145,18 +110,18 @@ class CheckUserLoginObserverTest extends \PHPUnit_Framework_TestCase
             ->with($formId)
             ->willReturn($captcha);
 
-        $response = $this->getMock('Magento\Framework\App\Response\Http', [], [], '', false);
+        $response = $this->createMock(\Magento\Framework\App\Response\Http::class);
         $response->expects($this->once())
         ->method('setRedirect')
         ->with($redirectUrl);
 
-        $request = $this->getMock('Magento\Framework\App\Request\Http', [], [], '', false);
+        $request = $this->createMock(\Magento\Framework\App\Request\Http::class);
         $request->expects($this->any())
             ->method('getPost')
             ->with('login')
             ->willReturn($loginParams);
 
-        $controller = $this->getMock('Magento\Framework\App\Action\Action', [], [], '', false);
+        $controller = $this->createMock(\Magento\Framework\App\Action\Action::class);
         $controller->expects($this->any())->method('getRequest')->will($this->returnValue($request));
         $controller->expects($this->any())->method('getResponse')->will($this->returnValue($response));
 
@@ -165,13 +130,7 @@ class CheckUserLoginObserverTest extends \PHPUnit_Framework_TestCase
             ->with($request, $formId)
             ->willReturn($captchaValue);
 
-        $customerDataMock = $this->getMock(
-            '\Magento\Customer\Model\Data\Customer',
-            ['getId'],
-            [],
-            '',
-            false
-        );
+        $customerDataMock = $this->createPartialMock(\Magento\Customer\Model\Data\Customer::class, ['getId']);
         $customerDataMock->expects($this->once())
             ->method('getId')
             ->willReturn($customerId);
@@ -181,14 +140,9 @@ class CheckUserLoginObserverTest extends \PHPUnit_Framework_TestCase
             ->with($login)
             ->willReturn($customerDataMock);
 
-        $this->accountManagementHelperMock->expects($this->once())
-            ->method('processCustomerLockoutData')
+        $this->authenticationMock->expects($this->once())
+            ->method('processAuthenticationFailure')
             ->with($customerId);
-
-        $this->customerRepositoryMock->expects($this->once())
-            ->method('save')
-            ->with($customerDataMock)
-            ->willReturnSelf();
 
         $this->messageManagerMock->expects($this->once())
             ->method('addError')

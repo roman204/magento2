@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\ResourceModel\Product\Indexer;
@@ -10,7 +10,10 @@ use Magento\Catalog\Api\Data\ProductInterface;
 /**
  * Catalog Product Indexer Abstract Resource Model
  *
+ * @api
+ *
  * @author      Magento Core Team <core@magentocommerce.com>
+ * @since 100.0.2
  */
 abstract class AbstractIndexer extends \Magento\Indexer\Model\ResourceModel\AbstractResource
 {
@@ -22,7 +25,8 @@ abstract class AbstractIndexer extends \Magento\Indexer\Model\ResourceModel\Abst
     protected $_eavConfig;
 
     /**
-     * @var \Magento\Framework\Model\Entity\MetadataPool
+     * @var \Magento\Framework\EntityManager\MetadataPool
+     * @since 101.0.0
      */
     protected $metadataPool;
 
@@ -32,18 +36,15 @@ abstract class AbstractIndexer extends \Magento\Indexer\Model\ResourceModel\Abst
      * @param \Magento\Framework\Model\ResourceModel\Db\Context $context
      * @param \Magento\Framework\Indexer\Table\StrategyInterface $tableStrategy
      * @param \Magento\Eav\Model\Config $eavConfig
-     * @param \Magento\Framework\Model\Entity\MetadataPool $metadataPool
      * @param string $connectionName
      */
     public function __construct(
         \Magento\Framework\Model\ResourceModel\Db\Context $context,
         \Magento\Framework\Indexer\Table\StrategyInterface $tableStrategy,
         \Magento\Eav\Model\Config $eavConfig,
-        \Magento\Framework\Model\Entity\MetadataPool $metadataPool,
         $connectionName = null
     ) {
         $this->_eavConfig = $eavConfig;
-        $this->metadataPool = $metadataPool;
         parent::__construct($context, $tableStrategy, $connectionName);
     }
 
@@ -78,7 +79,7 @@ abstract class AbstractIndexer extends \Magento\Indexer\Model\ResourceModel\Abst
         $attributeTable = $attribute->getBackend()->getTable();
         $connection = $this->getConnection();
         $joinType = $condition !== null || $required ? 'join' : 'joinLeft';
-        $productIdField = $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField();
+        $productIdField = $this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField();
 
         if ($attribute->isScopeGlobal()) {
             $alias = 'ta_' . $attrCode;
@@ -184,7 +185,7 @@ abstract class AbstractIndexer extends \Magento\Indexer\Model\ResourceModel\Abst
     public function getRelationsByChild($childIds)
     {
         $connection = $this->getConnection();
-        $linkField = $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField();
+        $linkField = $this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField();
         $select = $connection->select()->from(
             ['relation' => $this->getTable('catalog_product_relation')],
             []
@@ -197,7 +198,7 @@ abstract class AbstractIndexer extends \Magento\Indexer\Model\ResourceModel\Abst
             $childIds
         );
 
-        return $connection->fetchCol($select);
+        return array_map('intval', (array) $connection->fetchCol($select));
     }
 
     /**
@@ -215,7 +216,7 @@ abstract class AbstractIndexer extends \Magento\Indexer\Model\ResourceModel\Abst
         $result = [];
         if (!empty($parentIds)) {
             $connection = $this->getConnection();
-            $linkField = $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField();
+            $linkField = $this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField();
             $select = $connection->select()->from(
                 ['cpr' => $this->getTable('catalog_product_relation')],
                 'child_id'
@@ -229,6 +230,19 @@ abstract class AbstractIndexer extends \Magento\Indexer\Model\ResourceModel\Abst
             $result = $connection->fetchCol($select);
         }
 
-        return $result;
+        return array_map('intval', $result);
+    }
+
+    /**
+     * @return \Magento\Framework\EntityManager\MetadataPool
+     * @since 101.0.0
+     */
+    protected function getMetadataPool()
+    {
+        if (null === $this->metadataPool) {
+            $this->metadataPool = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\EntityManager\MetadataPool::class);
+        }
+        return $this->metadataPool;
     }
 }

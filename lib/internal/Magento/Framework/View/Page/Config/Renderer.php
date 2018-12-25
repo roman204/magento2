@@ -1,10 +1,12 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
+
 namespace Magento\Framework\View\Page\Config;
 
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\View\Asset\GroupedCollection;
 use Magento\Framework\View\Page\Config;
 
@@ -21,7 +23,7 @@ class Renderer implements RendererInterface
     protected $assetTypeOrder = ['css', 'ico', 'js'];
 
     /**
-     * @var \Magento\Framework\View\Page\Config
+     * @var Config
      */
     protected $pageConfig;
 
@@ -51,7 +53,7 @@ class Renderer implements RendererInterface
     protected $urlBuilder;
 
     /**
-     * @param \Magento\Framework\View\Page\Config $pageConfig
+     * @param Config $pageConfig
      * @param \Magento\Framework\View\Asset\MergeService $assetMergeService
      * @param \Magento\Framework\UrlInterface $urlBuilder
      * @param \Magento\Framework\Escaper $escaper
@@ -131,15 +133,35 @@ class Renderer implements RendererInterface
     /**
      * @param string $name
      * @param string $content
-     * @return mixed
+     * @return string
      */
     protected function processMetadataContent($name, $content)
     {
-        $method = 'get' . $this->string->upperCaseWords($name, '_', '');
-        if (method_exists($this->pageConfig, $method)) {
-            $content = $this->pageConfig->$method();
+        switch ($name) {
+            case Config::META_DESCRIPTION:
+                return $this->pageConfig->getDescription();
+
+            case Config::META_CONTENT_TYPE:
+                return $this->pageConfig->getContentType();
+
+            case Config::META_MEDIA_TYPE:
+                return $this->pageConfig->getMediaType();
+
+            case Config::META_CHARSET:
+                return $this->pageConfig->getCharset();
+
+            case Config::META_KEYWORDS:
+                return $this->pageConfig->getKeywords();
+
+            case Config::META_ROBOTS:
+                return $this->pageConfig->getRobots();
+
+            case Config::META_TITLE:
+                return $this->pageConfig->getMetaTitle();
+
+            default:
+                return $content;
         }
-        return $content;
     }
 
     /**
@@ -148,20 +170,24 @@ class Renderer implements RendererInterface
      */
     protected function getMetadataTemplate($name)
     {
+        if (strpos($name, 'og:') === 0) {
+            return '<meta property="' . $name . '" content="%content"/>' . "\n";
+        }
+
         switch ($name) {
-            case 'charset':
+            case Config::META_CHARSET:
                 $metadataTemplate = '<meta charset="%content"/>' . "\n";
                 break;
 
-            case 'content_type':
+            case Config::META_CONTENT_TYPE:
                 $metadataTemplate = '<meta http-equiv="Content-Type" content="%content"/>' . "\n";
                 break;
 
-            case 'x_ua_compatible':
+            case Config::META_X_UI_COMPATIBLE:
                 $metadataTemplate = '<meta http-equiv="X-UA-Compatible" content="%content"/>' . "\n";
                 break;
 
-            case 'media_type':
+            case Config::META_MEDIA_TYPE:
                 $metadataTemplate = false;
                 break;
 
@@ -232,19 +258,7 @@ class Renderer implements RendererInterface
      */
     protected function renderAssetGroup(\Magento\Framework\View\Asset\PropertyGroup $group)
     {
-        $groupAssets = $this->processMerge($group->getAll(), $group);
-
-        $attributes = $this->getGroupAttributes($group);
-        $attributes = $this->addDefaultAttributes(
-            $group->getProperty(GroupedCollection::PROPERTY_CONTENT_TYPE),
-            $attributes
-        );
-
-        $groupTemplate = $this->getAssetTemplate(
-            $group->getProperty(GroupedCollection::PROPERTY_CONTENT_TYPE),
-            $attributes
-        );
-        $groupHtml = $this->renderAssetHtml($groupTemplate, $groupAssets);
+        $groupHtml = $this->renderAssetHtml($group);
         $groupHtml = $this->processIeCondition($groupHtml, $group);
         return $groupHtml;
     }
@@ -342,23 +356,40 @@ class Renderer implements RendererInterface
     /**
      * Render HTML tags referencing corresponding URLs
      *
-     * @param string $template
-     * @param array $assets
+     * @param \Magento\Framework\View\Asset\PropertyGroup $group
      * @return string
      */
-    protected function renderAssetHtml($template, $assets)
+    protected function renderAssetHtml(\Magento\Framework\View\Asset\PropertyGroup $group)
     {
+        $assets = $this->processMerge($group->getAll(), $group);
+        $attributes = $this->getGroupAttributes($group);
+
         $result = '';
         try {
             /** @var $asset \Magento\Framework\View\Asset\AssetInterface */
             foreach ($assets as $asset) {
+                $template = $this->getAssetTemplate(
+                    $group->getProperty(GroupedCollection::PROPERTY_CONTENT_TYPE),
+                    $this->addDefaultAttributes($this->getAssetContentType($asset), $attributes)
+                );
                 $result .= sprintf($template, $asset->getUrl());
             }
-        } catch (\Magento\Framework\Exception\LocalizedException $e) {
+        } catch (LocalizedException $e) {
             $this->logger->critical($e);
             $result .= sprintf($template, $this->urlBuilder->getUrl('', ['_direct' => 'core/index/notFound']));
         }
         return $result;
+    }
+
+    /**
+     * Get asset content type
+     *
+     * @param \Magento\Framework\View\Asset\AssetInterface $asset
+     * @return string
+     */
+    protected function getAssetContentType(\Magento\Framework\View\Asset\AssetInterface $asset)
+    {
+        return $asset->getContentType();
     }
 
     /**

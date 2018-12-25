@@ -1,7 +1,7 @@
 <?php
 /**
  *
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Controller\Category;
@@ -111,7 +111,7 @@ class View extends \Magento\Framework\App\Action\Action
     /**
      * Initialize requested category object
      *
-     * @return \Magento\Catalog\Model\Category
+     * @return \Magento\Catalog\Model\Category|bool
      */
     protected function _initCategory()
     {
@@ -125,7 +125,7 @@ class View extends \Magento\Framework\App\Action\Action
         } catch (NoSuchEntityException $e) {
             return false;
         }
-        if (!$this->_objectManager->get('Magento\Catalog\Helper\Category')->canShow($category)) {
+        if (!$this->_objectManager->get(\Magento\Catalog\Helper\Category::class)->canShow($category)) {
             return false;
         }
         $this->_catalogSession->setLastVisitedCategoryId($category->getId());
@@ -136,7 +136,7 @@ class View extends \Magento\Framework\App\Action\Action
                 ['category' => $category, 'controller_action' => $this]
             );
         } catch (\Magento\Framework\Exception\LocalizedException $e) {
-            $this->_objectManager->get('Psr\Log\LoggerInterface')->critical($e);
+            $this->_objectManager->get(\Psr\Log\LoggerInterface::class)->critical($e);
             return false;
         }
 
@@ -152,7 +152,9 @@ class View extends \Magento\Framework\App\Action\Action
      */
     public function execute()
     {
-        if ($this->_request->getParam(\Magento\Framework\App\ActionInterface::PARAM_NAME_URL_ENCODED)) {
+        if (!$this->_request->getParam('___from_store')
+            && $this->_request->getParam(self::PARAM_NAME_URL_ENCODED)
+        ) {
             return $this->resultRedirectFactory->create()->setUrl($this->_redirect->getRedirectUrl());
         }
         $category = $this->_initCategory();
@@ -172,24 +174,28 @@ class View extends \Magento\Framework\App\Action\Action
             if ($settings->getPageLayout()) {
                 $page->getConfig()->setPageLayout($settings->getPageLayout());
             }
+
+            $hasChildren = $category->hasChildren();
             if ($category->getIsAnchor()) {
-                $type = $category->hasChildren() ? 'layered' : 'layered_without_children';
+                $type = $hasChildren ? 'layered' : 'layered_without_children';
             } else {
-                $type = $category->hasChildren() ? 'default' : 'default_without_children';
+                $type = $hasChildren ? 'default' : 'default_without_children';
             }
 
-            if (!$category->hasChildren()) {
+            if (!$hasChildren) {
                 // Two levels removed from parent.  Need to add default page type.
                 $parentType = strtok($type, '_');
-                $page->addPageLayoutHandles(['type' => $parentType]);
+                $page->addPageLayoutHandles(['type' => $parentType], null, false);
             }
-            $page->addPageLayoutHandles(['type' => $type, 'id' => $category->getId()]);
+            $page->addPageLayoutHandles(['type' => $type], null, false);
+            $page->addPageLayoutHandles(['id' => $category->getId()]);
 
             // apply custom layout update once layout is loaded
             $layoutUpdates = $settings->getLayoutUpdates();
             if ($layoutUpdates && is_array($layoutUpdates)) {
                 foreach ($layoutUpdates as $layoutUpdate) {
                     $page->addUpdate($layoutUpdate);
+                    $page->addPageLayoutHandles(['layout_update' => md5($layoutUpdate)], null, false);
                 }
             }
 

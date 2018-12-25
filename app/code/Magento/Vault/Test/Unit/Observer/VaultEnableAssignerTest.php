@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Vault\Test\Unit\Observer;
@@ -10,10 +10,11 @@ use Magento\Framework\Event;
 use Magento\Framework\Event\Observer;
 use Magento\Payment\Model\InfoInterface;
 use Magento\Payment\Observer\AbstractDataAssignObserver;
+use Magento\Quote\Api\Data\PaymentInterface;
 use Magento\Vault\Model\Ui\VaultConfigProvider;
 use Magento\Vault\Observer\VaultEnableAssigner;
 
-class VaultEnableAssignerTest extends \PHPUnit_Framework_TestCase
+class VaultEnableAssignerTest extends \PHPUnit\Framework\TestCase
 {
     public function testExecuteNoActiveCode()
     {
@@ -39,10 +40,12 @@ class VaultEnableAssignerTest extends \PHPUnit_Framework_TestCase
     {
         $dataObject = new DataObject(
             [
-                VaultConfigProvider::IS_ACTIVE_CODE => $activeCode
+                PaymentInterface::KEY_ADDITIONAL_DATA => [
+                    VaultConfigProvider::IS_ACTIVE_CODE => $activeCode
+                ]
             ]
         );
-        $paymentModel = $this->getMock(InfoInterface::class);
+        $paymentModel = $this->createMock(InfoInterface::class);
 
         $paymentModel->expects(static::once())
             ->method('setAdditionalInformation')
@@ -76,6 +79,30 @@ class VaultEnableAssignerTest extends \PHPUnit_Framework_TestCase
             ['0', false],
             ['off', false]
         ];
+    }
+
+    public function testExecuteNever()
+    {
+        $dataObject = new DataObject(
+            [
+                PaymentInterface::KEY_ADDITIONAL_DATA => []
+            ]
+        );
+        $paymentModel = $this->createMock(InfoInterface::class);
+
+        $paymentModel->expects(static::never())
+            ->method('setAdditionalInformation');
+
+        $observer = $this->getPreparedObserverWithMap(
+            [
+                [AbstractDataAssignObserver::DATA_CODE, $dataObject],
+                [AbstractDataAssignObserver::MODEL_CODE, $paymentModel]
+            ]
+        );
+
+        $vaultEnableAssigner = new VaultEnableAssigner();
+
+        $vaultEnableAssigner->execute($observer);
     }
 
     /**

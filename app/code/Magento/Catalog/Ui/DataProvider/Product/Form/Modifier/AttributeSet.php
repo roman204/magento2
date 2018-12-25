@@ -1,11 +1,11 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Ui\DataProvider\Product\Form\Modifier;
 
-use Magento\Catalog\Model\AttributeConstantsInterface;
+use Magento\Catalog\Api\Data\ProductAttributeInterface;
 use Magento\Catalog\Model\Locator\LocatorInterface;
 use Magento\Eav\Model\ResourceModel\Entity\Attribute\Set\CollectionFactory;
 use Magento\Store\Model\StoreManagerInterface;
@@ -14,6 +14,9 @@ use Magento\Ui\Component\Form\Field;
 
 /**
  * Add "Attribute Set" to first fieldset
+ *
+ * @api
+ * @since 101.0.0
  */
 class AttributeSet extends AbstractModifier
 {
@@ -26,16 +29,19 @@ class AttributeSet extends AbstractModifier
      * Set collection factory
      *
      * @var CollectionFactory
+     * @since 101.0.0
      */
     protected $attributeSetCollectionFactory;
 
     /**
      * @var UrlInterface
+     * @since 101.0.0
      */
     protected $urlBuilder;
 
     /**
      * @var LocatorInterface
+     * @since 101.0.0
      */
     protected $locator;
 
@@ -58,6 +64,7 @@ class AttributeSet extends AbstractModifier
      * Return options for select
      *
      * @return array
+     * @since 101.0.0
      */
     public function getOptions()
     {
@@ -76,12 +83,13 @@ class AttributeSet extends AbstractModifier
 
     /**
      * {@inheritdoc}
+     * @since 101.0.0
      */
     public function modifyMeta(array $meta)
     {
         if ($name = $this->getGeneralPanelName($meta)) {
             $meta[$name]['children']['attribute_set_id']['arguments']['data']['config']  = [
-                'component' => 'Magento_Ui/js/form/element/ui-select',
+                'component' => 'Magento_Catalog/js/components/attribute-set-select',
                 'disableLabel' => true,
                 'filterOptions' => true,
                 'elementTmpl' => 'ui/grid/filters/elements/ui-select',
@@ -96,10 +104,11 @@ class AttributeSet extends AbstractModifier
                 'filterUrl' => $this->urlBuilder->getUrl('catalog/product/suggestAttributeSets', ['isAjax' => 'true']),
                 'sortOrder' => $this->getNextAttributeSortOrder(
                     $meta,
-                    [AttributeConstantsInterface::CODE_STATUS],
+                    [ProductAttributeInterface::CODE_STATUS],
                     self::ATTRIBUTE_SET_FIELD_ORDER
                 ),
                 'multiple' => false,
+                'disabled' => $this->locator->getProduct()->isLockedAttribute('attribute_set_id'),
             ];
         }
 
@@ -108,6 +117,7 @@ class AttributeSet extends AbstractModifier
 
     /**
      * {@inheritdoc}
+     * @since 101.0.0
      */
     public function modifyData(array $data)
     {

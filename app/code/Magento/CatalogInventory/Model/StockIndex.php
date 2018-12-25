@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -78,6 +78,7 @@ class StockIndex implements StockIndexInterface
      *
      * @param int $productId
      * @param int $scopeId
+     * @deprecated 100.1.0
      * @return true
      * @SuppressWarnings(PHPMD.UnusedLocalVariable)
      */
@@ -108,6 +109,7 @@ class StockIndex implements StockIndexInterface
      *
      * @param int $productId
      * @param int $websiteId
+     * @deprecated 100.1.0
      * @return void
      */
     public function updateProductStockStatus($productId, $websiteId)
@@ -267,7 +269,7 @@ class StockIndex implements StockIndexInterface
     {
         if (empty($this->stockStatusResource)) {
             $this->stockStatusResource = \Magento\Framework\App\ObjectManager::getInstance()->get(
-                'Magento\CatalogInventory\Model\ResourceModel\Stock\Status'
+                \Magento\CatalogInventory\Model\ResourceModel\Stock\Status::class
             );
         }
         return $this->stockStatusResource;

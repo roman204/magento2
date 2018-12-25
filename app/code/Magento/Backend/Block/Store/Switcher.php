@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -9,14 +9,15 @@ namespace Magento\Backend\Block\Store;
 /**
  * Store switcher block
  *
- * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @api
+ * @since 100.0.2
  */
 class Switcher extends \Magento\Backend\Block\Template
 {
     /**
      * URL for store switcher hint
      */
-    const HINT_URL = 'http://docs.magento.com/m2/ce/user_guide/stores/configuration.html';
+    const HINT_URL = 'http://docs.magento.com/m2/ce/user_guide/configuration/scope.html';
 
     /**
      * Name of website variable
@@ -152,11 +153,7 @@ class Switcher extends \Magento\Backend\Block\Template
     {
         $websites = $this->_storeManager->getWebsites();
         if ($websiteIds = $this->getWebsiteIds()) {
-            foreach (array_keys($websites) as $websiteId) {
-                if (!in_array($websiteId, $websiteIds)) {
-                    unset($websites[$websiteId]);
-                }
-            }
+            $websites = array_intersect_key($websites, array_flip($websiteIds));
         }
         return $websites;
     }

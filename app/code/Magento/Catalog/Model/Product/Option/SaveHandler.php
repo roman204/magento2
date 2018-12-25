@@ -1,24 +1,18 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
 namespace Magento\Catalog\Model\Product\Option;
 
 use Magento\Catalog\Api\ProductCustomOptionRepositoryInterface as OptionRepository;
-use Magento\Framework\Model\Entity\MetadataPool;
+use Magento\Framework\EntityManager\Operation\ExtensionInterface;
 
 /**
  * Class SaveHandler
  */
-class SaveHandler
+class SaveHandler implements ExtensionInterface
 {
-    /**
-     * @var MetadataPool
-     */
-    protected $metadataPool;
-
     /**
      * @var OptionRepository
      */
@@ -26,33 +20,43 @@ class SaveHandler
 
     /**
      * @param OptionRepository $optionRepository
-     * @param MetadataPool $metadataPool
      */
     public function __construct(
-        OptionRepository $optionRepository,
-        MetadataPool $metadataPool
+        OptionRepository $optionRepository
     ) {
         $this->optionRepository = $optionRepository;
-        $this->metadataPool = $metadataPool;
     }
 
     /**
-     * @param string $entityType
      * @param object $entity
-     * @return object
+     * @param array $arguments
+     * @return \Magento\Catalog\Api\Data\ProductInterface|object
      * @SuppressWarnings(PHPMD.UnusedFormalParameter)
      */
-    public function execute($entityType, $entity)
+    public function execute($entity, $arguments = [])
     {
+        $options = $entity->getOptions();
+        $optionIds = [];
+
+        if ($options) {
+            $optionIds = array_map(function ($option) {
+                /** @var \Magento\Catalog\Model\Product\Option $option */
+                return $option->getOptionId();
+            }, $options);
+        }
+
         /** @var \Magento\Catalog\Api\Data\ProductInterface $entity */
         foreach ($this->optionRepository->getProductOptions($entity) as $option) {
-            $this->optionRepository->delete($option);
+            if (!in_array($option->getOptionId(), $optionIds)) {
+                $this->optionRepository->delete($option);
+            }
         }
-        if ($entity->getOptions()) {
-            foreach ($entity->getOptions() as $option) {
+        if ($options) {
+            foreach ($options as $option) {
                 $this->optionRepository->save($option);
             }
         }
+
         return $entity;
     }
 }

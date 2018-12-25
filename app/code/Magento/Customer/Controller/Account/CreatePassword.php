@@ -1,7 +1,7 @@
 <?php
 /**
  *
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Controller\Account;
@@ -13,7 +13,9 @@ use Magento\Framework\App\Action\Context;
 
 class CreatePassword extends \Magento\Customer\Controller\AbstractAccount
 {
-    /** @var AccountManagementInterface */
+    /**
+     * @var \Magento\Customer\Api\AccountManagementInterface
+     */
     protected $accountManagement;
 
     /**
@@ -52,27 +54,30 @@ class CreatePassword extends \Magento\Customer\Controller\AbstractAccount
     public function execute()
     {
         $resetPasswordToken = (string)$this->getRequest()->getParam('token');
-        $customerId = (int)$this->getRequest()->getParam('id');
-        $isDirectLink = $resetPasswordToken != '' && $customerId != 0;
+        $isDirectLink = $resetPasswordToken != '';
         if (!$isDirectLink) {
             $resetPasswordToken = (string)$this->session->getRpToken();
-            $customerId = (int)$this->session->getRpCustomerId();
         }
 
         try {
-            $this->accountManagement->validateResetPasswordLinkToken($customerId, $resetPasswordToken);
+            $this->accountManagement->validateResetPasswordLinkToken(
+                0,
+                $resetPasswordToken
+            );
 
             if ($isDirectLink) {
                 $this->session->setRpToken($resetPasswordToken);
-                $this->session->setRpCustomerId($customerId);
                 $resultRedirect = $this->resultRedirectFactory->create();
                 $resultRedirect->setPath('*/*/createpassword');
+
                 return $resultRedirect;
             } else {
                 /** @var \Magento\Framework\View\Result\Page $resultPage */
                 $resultPage = $this->resultPageFactory->create();
-                $resultPage->getLayout()->getBlock('resetPassword')->setCustomerId($customerId)
+                $resultPage->getLayout()
+                    ->getBlock('resetPassword')
                     ->setResetPasswordLinkToken($resetPasswordToken);
+
                 return $resultPage;
             }
         } catch (\Exception $exception) {

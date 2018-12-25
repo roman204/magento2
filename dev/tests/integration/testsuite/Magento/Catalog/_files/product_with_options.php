@@ -1,13 +1,13 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
 
 /** @var $product \Magento\Catalog\Model\Product */
-$product = $objectManager->create('Magento\Catalog\Model\Product');
+$product = $objectManager->create(\Magento\Catalog\Model\Product::class);
 
 $product->setTypeId(
     'simple'
@@ -33,7 +33,12 @@ $product->setTypeId(
     \Magento\Catalog\Model\Product\Attribute\Source\Status::STATUS_ENABLED
 )->setCanSaveCustomOptions(
     true
-);
+)->setStockData(
+    [
+        'qty' => 100,
+        'is_in_stock' => 1
+    ]
+)->setHasOptions(true);
 
 $options = [
     [
@@ -41,7 +46,7 @@ $options = [
         'type' => 'field',
         'is_require' => true,
         'sort_order' => 1,
-        'price' => 10.0,
+        'price' => -10.0,
         'price_type' => 'fixed',
         'sku' => 'sku1',
         'max_characters' => 10,
@@ -189,7 +194,7 @@ $options = [
 $customOptions = [];
 
 /** @var \Magento\Catalog\Api\Data\ProductCustomOptionInterfaceFactory $customOptionFactory */
-$customOptionFactory = $objectManager->create('Magento\Catalog\Api\Data\ProductCustomOptionInterfaceFactory');
+$customOptionFactory = $objectManager->create(\Magento\Catalog\Api\Data\ProductCustomOptionInterfaceFactory::class);
 
 foreach ($options as $option) {
     /** @var \Magento\Catalog\Api\Data\ProductCustomOptionInterface $customOption */
@@ -199,4 +204,8 @@ foreach ($options as $option) {
     $customOptions[] = $customOption;
 }
 
-$product->setOptions($customOptions)->save();
+$product->setOptions($customOptions);
+
+/** @var \Magento\Catalog\Api\ProductRepositoryInterface $productRepositoryFactory */
+$productRepository = $objectManager->create(\Magento\Catalog\Api\ProductRepositoryInterface::class);
+$productRepository->save($product);

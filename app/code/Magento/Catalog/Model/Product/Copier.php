@@ -1,16 +1,24 @@
 <?php
 /**
- * Catalog product copier. Creates product duplicate
- *
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\Product;
 
+use Magento\Catalog\Api\Data\ProductInterface;
+use Magento\Catalog\Model\Product;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\EntityManager\MetadataPool;
+use Magento\Catalog\Model\ProductFactory;
+use Magento\Catalog\Model\Product\Option\Repository as OptionRepository;
+
+/**
+ * Catalog product copier. Creates product duplicate
+ */
 class Copier
 {
     /**
-     * @var Option\Repository
+     * @var OptionRepository
      */
     protected $optionRepository;
 
@@ -20,40 +28,47 @@ class Copier
     protected $copyConstructor;
 
     /**
-     * @var \Magento\Catalog\Model\ProductFactory
+     * @var ProductFactory
      */
     protected $productFactory;
 
     /**
+     * @var MetadataPool
+     */
+    protected $metadataPool;
+
+    /**
      * @param CopyConstructorInterface $copyConstructor
-     * @param \Magento\Catalog\Model\ProductFactory $productFactory
-     * @param Option\Repository $optionRepository
+     * @param ProductFactory $productFactory
      */
     public function __construct(
         CopyConstructorInterface $copyConstructor,
-        \Magento\Catalog\Model\ProductFactory $productFactory,
-        \Magento\Catalog\Model\Product\Option\Repository $optionRepository
+        ProductFactory $productFactory
     ) {
         $this->productFactory = $productFactory;
         $this->copyConstructor = $copyConstructor;
-        $this->optionRepository = $optionRepository;
     }
 
     /**
      * Create product duplicate
      *
-     * @param \Magento\Catalog\Model\Product $product
-     * @return \Magento\Catalog\Model\Product
+     * @param Product $product
+     * @return Product
      */
-    public function copy(\Magento\Catalog\Model\Product $product)
+    public function copy(Product $product)
     {
         $product->getWebsiteIds();
         $product->getCategoryIds();
 
+        $metadata = $this->getMetadataPool()->getMetadata(ProductInterface::class);
+
         $duplicate = $this->productFactory->create();
-        $duplicate->setData($product->getData());
+        $productData = $product->getData();
+        $productData = $this->removeStockItem($productData);
+        $duplicate->setData($productData);
+        $duplicate->setOptions([]);
         $duplicate->setIsDuplicate(true);
-        $duplicate->setOriginalId($product->getEntityId());
+        $duplicate->setOriginalLinkId($product->getData($metadata->getLinkField()));
         $duplicate->setStatus(\Magento\Catalog\Model\Product\Attribute\Source\Status::STATUS_DISABLED);
         $duplicate->setCreatedAt(null);
         $duplicate->setUpdatedAt(null);
@@ -72,11 +87,55 @@ class Copier
                 $duplicate->save();
                 $isDuplicateSaved = true;
             } catch (\Magento\Framework\Exception\AlreadyExistsException $e) {
+            } catch (\Magento\UrlRewrite\Model\Exception\UrlAlreadyExistsException $e) {
             }
         } while (!$isDuplicateSaved);
-
-        $this->optionRepository->duplicate($product, $duplicate);
-        $product->getResource()->duplicate($product->getEntityId(), $duplicate->getEntityId());
+        $this->getOptionRepository()->duplicate($product, $duplicate);
+        $product->getResource()->duplicate(
+            $product->getData($metadata->getLinkField()),
+            $duplicate->getData($metadata->getLinkField())
+        );
         return $duplicate;
+    }
+
+    /**
+     * @return OptionRepository
+     * @deprecated 101.0.0
+     */
+    private function getOptionRepository()
+    {
+        if (null === $this->optionRepository) {
+            $this->optionRepository = ObjectManager::getInstance()->get(OptionRepository::class);
+        }
+        return $this->optionRepository;
+    }
+
+    /**
+     * @return MetadataPool
+     * @deprecated 101.0.0
+     */
+    private function getMetadataPool()
+    {
+        if (null === $this->metadataPool) {
+            $this->metadataPool = ObjectManager::getInstance()->get(MetadataPool::class);
+        }
+        return $this->metadataPool;
+    }
+
+    /**
+     * Remove stock item
+     *
+     * @param array $productData
+     * @return array
+     */
+    private function removeStockItem(array $productData)
+    {
+        if (isset($productData[ProductInterface::EXTENSION_ATTRIBUTES_KEY])) {
+            $extensionAttributes = $productData[ProductInterface::EXTENSION_ATTRIBUTES_KEY];
+            if (null !== $extensionAttributes->getStockItem()) {
+                $extensionAttributes->setData('stock_item', null);
+            }
+        }
+        return $productData;
     }
 }

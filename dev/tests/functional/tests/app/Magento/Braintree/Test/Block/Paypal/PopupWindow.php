@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Braintree\Test\Block\Paypal;
@@ -40,15 +40,15 @@ class PopupWindow extends Block
     /**
      * Process PayPal auth flow
      *
-     * @return void
+     * @param null|string $parentWindow
+     *
      */
-    public function process()
+    public function process($parentWindow = null)
     {
         $this->browser->selectWindow();
         $this->waitForFormLoaded();
         $this->browser->find($this->submitButton)->click();
-        $this->waitForElementNotVisible($this->selector);
-        $this->browser->selectWindow();
+        $this->browser->selectWindow($parentWindow);
         $this->waitForElementNotVisible($this->loader);
     }
 }

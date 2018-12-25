@@ -1,48 +1,31 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 namespace Magento\Ui\Test\Block\Adminhtml;
 
-use Magento\Mtf\Client\Locator;
-use Magento\Mtf\Client\ElementInterface;
 use Magento\Mtf\Fixture\InjectableFixture;
 
 /**
- * Is used to represent a new unified form with collapsible sections on the page.
+ * Is used to represent a new unified form with collapsible sections inside.
  */
 class FormSections extends AbstractFormContainers
 {
     /**
-     * CSS locator of the section collapsible title
+     * CSS locator of collapsed section.
      *
      * @var string
      */
-    protected $sectionTitle = '.fieldset-wrapper-title';
+    protected $collapsedSection = '[data-state-collapsible="closed"]';
 
     /**
-     * CSS locator of the section content
+     * CSS locator of expanded section.
      *
      * @var string
      */
-    protected $content = '.admin__fieldset-wrapper-content';
-
-    /**
-     * XPath locator of the collapsible fieldset
-     *
-     * @var string
-     */
-    protected $collapsible =
-        'div[contains(@class,"fieldset-wrapper")][contains(@class,"admin__collapsible-block-wrapper")]';
-
-    /**
-     * Locator for opened collapsible tab.
-     *
-     * @var string
-     */
-    protected $opened = '._show';
+    protected $expandedSection = '[data-state-collapsible="open"]';
 
     /**
      * Get Section class.
@@ -65,79 +48,77 @@ class FormSections extends AbstractFormContainers
     }
 
     /**
-     * Get the section title element
-     *
-     * @param string $sectionName
-     * @return ElementInterface
-     */
-    protected function getSectionTitleElement($sectionName)
-    {
-        $container = $this->getContainerElement($sectionName);
-        return $container->find($this->sectionTitle);
-    }
-
-    /**
-     * Opens the section.
+     * Expand section by its name
      *
      * @param string $sectionName
      * @return $this
+     * @throws \Exception if section is not visible
      */
     public function openSection($sectionName)
     {
-        if ($this->isCollapsible($sectionName) && !$this->isCollapsed($sectionName)) {
-            $this->getSectionTitleElement($sectionName)->click();
-        } else {
-            //Scroll to the top of the page so that the page actions header does not overlap any controls
-            $this->browser->find($this->header)->hover();
+        $container = $this->getContainerElement($sectionName);
+        if (!$container->isVisible()) {
+            throw new \Exception('Container is not found "' . $sectionName . '""');
         }
+        $section = $container->find($this->collapsedSection);
+        if ($section->isVisible()) {
+            $section->click();
+        }
+
         return $this;
     }
 
     /**
-     * Checks if the section is collapsible on the form.
+     * Check if section is collapsible.
      *
+     * @deprecated
      * @param string $sectionName
      * @return bool
      */
     public function isCollapsible($sectionName)
     {
-        $title = $this->getSectionTitleElement($sectionName);
-        if (!$title->isVisible()) {
+        $section = $this->getContainerElement($sectionName);
+
+        if ($section->find($this->collapsedSection)->isVisible()) {
+            return true;
+        } elseif ($section->find($this->expandedSection)->isVisible()) {
+            return true;
+        } else {
             return false;
-        };
-        return $title->find('parent::' . $this->collapsible, Locator::SELECTOR_XPATH)->isVisible();
+        }
     }
 
     /**
-     * Check if collapsible section is opened.
-     *
-     * @param string $sectionName
-     * @return bool
-     */
-    public function isCollapsed($sectionName)
-    {
-        return $this->getContainerElement($sectionName)->find($this->opened)->isVisible();
-    }
-
-    /**
-     * Get Require Notice Attributes.
+     * Get require notice fields.
      *
      * @param InjectableFixture $product
      * @return array
      */
-    public function getRequireNoticeAttributes(InjectableFixture $product)
+    public function getRequireNoticeFields(InjectableFixture $product)
     {
         $data = [];
-        $tabs = $this->getFixtureFieldsByContainers($product);
-        foreach (array_keys($tabs) as $tabName) {
-            $tab = $this->getSection($tabName);
-            $this->openSection($tabName);
-            $errors = $tab->getJsErrors();
+        $sections = $this->getFixtureFieldsByContainers($product);
+        foreach (array_keys($sections) as $sectionName) {
+            $section = $this->getSection($sectionName);
+            $this->openSection($sectionName);
+            $errors = $section->getValidationErrors();
             if (!empty($errors)) {
-                $data[$tabName] = $errors;
+                $data[$sectionName] = $errors;
             }
         }
 
         return $data;
+    }
+
+    /**
+     * Check if section is visible.
+     *
+     * @deprecated
+     * @param string $sectionName
+     * @return bool
+     */
+    public function isSectionVisible($sectionName)
+    {
+        return !$this->getContainerElement($sectionName)->find($this->collapsedSection)->isVisible();
     }
 }

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\CatalogInventory\Model\Stock;
@@ -17,14 +17,6 @@ use Magento\Framework\Model\AbstractExtensibleModel;
  */
 class Status extends AbstractExtensibleModel implements StockStatusInterface
 {
-    /**#@+
-     * Stock Status values
-     */
-    const STATUS_OUT_OF_STOCK = 0;
-
-    const STATUS_IN_STOCK = 1;
-    /**#@-*/
-
     /**#@+
      * Field name
      */
@@ -74,10 +66,11 @@ class Status extends AbstractExtensibleModel implements StockStatusInterface
      */
     protected function _construct()
     {
-        $this->_init('Magento\CatalogInventory\Model\ResourceModel\Stock\Status');
+        $this->_init(\Magento\CatalogInventory\Model\ResourceModel\Stock\Status::class);
     }
 
     //@codeCoverageIgnoreStart
+
     /**
      * @return int
      */
@@ -99,7 +92,7 @@ class Status extends AbstractExtensibleModel implements StockStatusInterface
      */
     public function getStockId()
     {
-        return $this->getData(self::KEY_WEBSITE_ID);
+        return $this->getData(self::KEY_STOCK_ID);
     }
 
     /**
@@ -113,10 +106,11 @@ class Status extends AbstractExtensibleModel implements StockStatusInterface
     /**
      * @return int
      */
-    public function getStockStatus()
+    public function getStockStatus(): int
     {
-        return $this->getData(self::KEY_STOCK_STATUS);
+        return (int)$this->getData(self::KEY_STOCK_STATUS);
     }
+
     //@codeCoverageIgnoreEnd
 
     /**
@@ -128,6 +122,7 @@ class Status extends AbstractExtensibleModel implements StockStatusInterface
     }
 
     //@codeCoverageIgnoreStart
+
     /**
      * @param int $productId
      * @return $this
@@ -194,5 +189,6 @@ class Status extends AbstractExtensibleModel implements StockStatusInterface
     ) {
         return $this->_setExtensionAttributes($extensionAttributes);
     }
+
     //@codeCoverageIgnoreEnd
 }

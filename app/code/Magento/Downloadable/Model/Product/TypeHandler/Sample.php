@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Downloadable\Model\Product\TypeHandler;
@@ -11,11 +11,14 @@ use Magento\Downloadable\Model\ComponentInterface;
 
 /**
  * Class Sample
+ * @api
+ * @since 100.0.2
  */
 class Sample extends AbstractTypeHandler
 {
     const DATA_KEY = 'sample';
     const IDENTIFIER_KEY = 'sample_id';
+
     /**
      * @var \Magento\Downloadable\Model\SampleFactory
      */
@@ -29,18 +32,16 @@ class Sample extends AbstractTypeHandler
     /**
      * @param \Magento\Framework\Json\Helper\Data $jsonHelper
      * @param \Magento\Downloadable\Helper\File $downloadableFile
-     * @param \Magento\Framework\Model\Entity\MetadataPool $metadataPool
      * @param \Magento\Downloadable\Model\SampleFactory $sampleFactory
      * @param \Magento\Downloadable\Model\ResourceModel\SampleFactory $sampleResourceFactory
      */
     public function __construct(
         \Magento\Framework\Json\Helper\Data $jsonHelper,
         \Magento\Downloadable\Helper\File $downloadableFile,
-        \Magento\Framework\Model\Entity\MetadataPool $metadataPool,
         \Magento\Downloadable\Model\SampleFactory $sampleFactory,
         \Magento\Downloadable\Model\ResourceModel\SampleFactory $sampleResourceFactory
     ) {
-        parent::__construct($jsonHelper, $downloadableFile, $metadataPool);
+        parent::__construct($jsonHelper, $downloadableFile);
         $this->sampleFactory = $sampleFactory;
         $this->sampleResourceFactory = $sampleResourceFactory;
     }
@@ -93,7 +94,7 @@ class Sample extends AbstractTypeHandler
             $data['type']
         )->setProductId(
             $product->getData(
-                $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField()
+                $this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField()
             )
         );
         $model->setStoreId(

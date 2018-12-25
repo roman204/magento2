@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -44,6 +44,7 @@ class InstallData implements InstallDataInterface
         $eavSetup = $this->eavSetupFactory->create(['setup' => $setup]);
         $attributes = [
             'country_of_manufacture',
+            'manufacturer',
             'minimal_price',
             'msrp',
             'msrp_display_actual_price_type',
@@ -53,6 +54,7 @@ class InstallData implements InstallDataInterface
             'special_to_date',
             'tier_price',
             'weight',
+            'color'
         ];
         foreach ($attributes as $attributeCode) {
             $relatedProductTypes = explode(

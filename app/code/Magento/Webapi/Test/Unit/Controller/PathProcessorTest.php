@@ -1,6 +1,6 @@
 <?php
 /***
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -8,7 +8,7 @@ namespace Magento\Webapi\Test\Unit\Controller;
 
 use Magento\Store\Model\Store;
 
-class PathProcessorTest extends \PHPUnit_Framework_TestCase
+class PathProcessorTest extends \PHPUnit\Framework\TestCase
 {
     /** @var \PHPUnit_Framework_MockObject_MockObject | \Magento\Store\Model\StoreManagerInterface */
     private $storeManagerMock;
@@ -22,9 +22,9 @@ class PathProcessorTest extends \PHPUnit_Framework_TestCase
     /** @var string */
     private $endpointPath = '/V1/path/of/endpoint';
 
-    public function setUp()
+    protected function setUp()
     {
-        $this->storeManagerMock = $this->getMockBuilder('Magento\Store\Model\StoreManagerInterface')
+        $this->storeManagerMock = $this->getMockBuilder(\Magento\Store\Model\StoreManagerInterface::class)
             ->disableOriginalConstructor()
             ->getMock();
         $this->storeManagerMock->expects($this->once())
@@ -51,6 +51,9 @@ class PathProcessorTest extends \PHPUnit_Framework_TestCase
         $this->assertSame($this->endpointPath, $result);
     }
 
+    /**
+     * @return array
+     */
     public function processPathDataProvider()
     {
         return [

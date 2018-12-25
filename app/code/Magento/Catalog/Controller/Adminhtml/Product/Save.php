@@ -1,14 +1,21 @@
 <?php
 /**
  *
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Controller\Adminhtml\Product;
 
 use Magento\Backend\App\Action;
+use Magento\Catalog\Api\Data\ProductInterface;
 use Magento\Catalog\Controller\Adminhtml\Product;
+use Magento\Store\Model\StoreManagerInterface;
+use Magento\Framework\App\Request\DataPersistorInterface;
 
+/**
+ * Class Save
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
 class Save extends \Magento\Catalog\Controller\Adminhtml\Product
 {
     /**
@@ -37,12 +44,23 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
     protected $productRepository;
 
     /**
+     * @var DataPersistorInterface
+     */
+    protected $dataPersistor;
+
+    /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * Save constructor.
+     *
      * @param Action\Context $context
      * @param Builder $productBuilder
      * @param Initialization\Helper $initializationHelper
      * @param \Magento\Catalog\Model\Product\Copier $productCopier
      * @param \Magento\Catalog\Model\Product\TypeTransitionManager $productTypeManager
-     * @param \Magento\Catalog\Api\CategoryLinkManagementInterface $categoryLinkManagement
      * @param \Magento\Catalog\Api\ProductRepositoryInterface $productRepository
      */
     public function __construct(
@@ -51,13 +69,11 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
         Initialization\Helper $initializationHelper,
         \Magento\Catalog\Model\Product\Copier $productCopier,
         \Magento\Catalog\Model\Product\TypeTransitionManager $productTypeManager,
-        \Magento\Catalog\Api\CategoryLinkManagementInterface $categoryLinkManagement,
         \Magento\Catalog\Api\ProductRepositoryInterface $productRepository
     ) {
         $this->initializationHelper = $initializationHelper;
         $this->productCopier = $productCopier;
         $this->productTypeManager = $productTypeManager;
-        $this->categoryLinkManagement = $categoryLinkManagement;
         $this->productRepository = $productRepository;
         parent::__construct($context, $productBuilder);
     }
@@ -71,7 +87,9 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
      */
     public function execute()
     {
-        $storeId = $this->getRequest()->getParam('store');
+        $storeId = $this->getRequest()->getParam('store', 0);
+        $store = $this->getStoreManager()->getStore($storeId);
+        $this->getStoreManager()->setCurrentStore($store->getCode());
         $redirectBack = $this->getRequest()->getParam('back', false);
         $productId = $this->getRequest()->getParam('id');
         $resultRedirect = $this->resultRedirectFactory->create();
@@ -84,31 +102,36 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
                     $this->productBuilder->build($this->getRequest())
                 );
                 $this->productTypeManager->processProduct($product);
-
                 if (isset($data['product'][$product->getIdFieldName()])) {
                     throw new \Magento\Framework\Exception\LocalizedException(__('Unable to save product'));
                 }
 
                 $originalSku = $product->getSku();
+                $canSaveCustomOptions = $product->getCanSaveCustomOptions();
                 $product->save();
                 $this->handleImageRemoveError($data, $product->getId());
-                $this->categoryLinkManagement->assignProductToCategories(
+                $this->getCategoryLinkManagement()->assignProductToCategories(
                     $product->getSku(),
                     $product->getCategoryIds()
                 );
                 $productId = $product->getEntityId();
                 $productAttributeSetId = $product->getAttributeSetId();
                 $productTypeId = $product->getTypeId();
-
-                $this->copyToStores($data, $productId);
-
-                $this->messageManager->addSuccess(__('You saved the product.'));
+                $extendedData = $data;
+                $extendedData['can_save_custom_options'] = $canSaveCustomOptions;
+                $this->copyToStores($extendedData, $productId);
+                $this->messageManager->addSuccessMessage(__('You saved the product.'));
+                $this->getDataPersistor()->clear('catalog_product');
                 if ($product->getSku() != $originalSku) {
-                    $this->messageManager->addNotice(
+                    $this->messageManager->addNoticeMessage(
                         __(
                             'SKU for product %1 has been changed to %2.',
-                            $this->_objectManager->get('Magento\Framework\Escaper')->escapeHtml($product->getName()),
-                            $this->_objectManager->get('Magento\Framework\Escaper')->escapeHtml($product->getSku())
+                            $this->_objectManager->get(
+                                \Magento\Framework\Escaper::class
+                            )->escapeHtml($product->getName()),
+                            $this->_objectManager->get(
+                                \Magento\Framework\Escaper::class
+                            )->escapeHtml($product->getSku())
                         )
                     );
                 }
@@ -118,22 +141,26 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
                 );
 
                 if ($redirectBack === 'duplicate') {
+                    $product->unsetData('quantity_and_stock_status');
                     $newProduct = $this->productCopier->copy($product);
-                    $this->messageManager->addSuccess(__('You duplicated the product.'));
+                    $this->messageManager->addSuccessMessage(__('You duplicated the product.'));
                 }
             } catch (\Magento\Framework\Exception\LocalizedException $e) {
-                $this->messageManager->addError($e->getMessage());
-                $this->_session->setProductData($data);
+                $this->_objectManager->get(\Psr\Log\LoggerInterface::class)->critical($e);
+                $this->messageManager->addExceptionMessage($e);
+                $data = isset($product) ? $this->persistMediaData($product, $data) : $data;
+                $this->getDataPersistor()->set('catalog_product', $data);
                 $redirectBack = $productId ? true : 'new';
             } catch (\Exception $e) {
-                $this->_objectManager->get('Psr\Log\LoggerInterface')->critical($e);
-                $this->messageManager->addError($e->getMessage());
-                $this->_session->setProductData($data);
+                $this->_objectManager->get(\Psr\Log\LoggerInterface::class)->critical($e);
+                $this->messageManager->addErrorMessage($e->getMessage());
+                $data = isset($product) ? $this->persistMediaData($product, $data) : $data;
+                $this->getDataPersistor()->set('catalog_product', $data);
                 $redirectBack = $productId ? true : 'new';
             }
         } else {
             $resultRedirect->setPath('catalog/*/', ['store' => $storeId]);
-            $this->messageManager->addError('No data to save');
+            $this->messageManager->addErrorMessage('No data to save');
             return $resultRedirect;
         }
 
@@ -179,7 +206,7 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
                 $expectedImagesAmount = count($postData['product']['media_gallery']['images']) - $removedImagesAmount;
                 $product = $this->productRepository->getById($productId);
                 if ($expectedImagesAmount != count($product->getMediaGallery('images'))) {
-                    $this->messageManager->addNotice(
+                    $this->messageManager->addNoticeMessage(
                         __('The image cannot be removed as it has been assigned to the other image role')
                     );
                 }
@@ -189,6 +216,9 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
 
     /**
      * Do copying data to stores
+     *
+     * If the 'copy_from' field is not specified in the input data,
+     * the store fallback mechanism will automatically take the admin store's default value.
      *
      * @param array $data
      * @param int $productId
@@ -201,18 +231,94 @@ class Save extends \Magento\Catalog\Controller\Adminhtml\Product
                 if (isset($data['product']['website_ids'][$websiteId])
                     && (bool)$data['product']['website_ids'][$websiteId]) {
                     foreach ($group as $store) {
-                        $copyFrom = (isset($store['copy_from'])) ? $store['copy_from'] : 0;
-                        $copyTo = (isset($store['copy_to'])) ? $store['copy_to'] : 0;
-                        if ($copyTo) {
-                            $this->_objectManager->create('Magento\Catalog\Model\Product')
-                                ->setStoreId($copyFrom)
-                                ->load($productId)
-                                ->setStoreId($copyTo)
-                                ->save();
+                        if (isset($store['copy_from'])) {
+                            $copyFrom = $store['copy_from'];
+                            $copyTo = (isset($store['copy_to'])) ? $store['copy_to'] : 0;
+                            if ($copyTo) {
+                                $this->_objectManager->create(\Magento\Catalog\Model\Product::class)
+                                    ->setStoreId($copyFrom)
+                                    ->load($productId)
+                                    ->setStoreId($copyTo)
+                                    ->setCanSaveCustomOptions($data['can_save_custom_options'])
+                                    ->setCopyFromView(true)
+                                    ->save();
+                            }
                         }
                     }
                 }
             }
         }
+    }
+
+    /**
+     * @return \Magento\Catalog\Api\CategoryLinkManagementInterface
+     */
+    private function getCategoryLinkManagement()
+    {
+        if (null === $this->categoryLinkManagement) {
+            $this->categoryLinkManagement = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Catalog\Api\CategoryLinkManagementInterface::class);
+        }
+        return $this->categoryLinkManagement;
+    }
+
+    /**
+     * @return StoreManagerInterface
+     * @deprecated 101.0.0
+     */
+    private function getStoreManager()
+    {
+        if (null === $this->storeManager) {
+            $this->storeManager = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Store\Model\StoreManagerInterface::class);
+        }
+        return $this->storeManager;
+    }
+
+    /**
+     * Retrieve data persistor
+     *
+     * @return DataPersistorInterface|mixed
+     * @deprecated 101.0.0
+     */
+    protected function getDataPersistor()
+    {
+        if (null === $this->dataPersistor) {
+            $this->dataPersistor = $this->_objectManager->get(DataPersistorInterface::class);
+        }
+
+        return $this->dataPersistor;
+    }
+
+    /**
+     * Persist media gallery on error, in order to show already saved images on next run.
+     *
+     * @param ProductInterface $product
+     * @param array $data
+     * @return array
+     */
+    private function persistMediaData(ProductInterface $product, array $data)
+    {
+        $mediaGallery = $product->getData('media_gallery');
+        if (!empty($mediaGallery['images'])) {
+            foreach ($mediaGallery['images'] as $key => $image) {
+                if (!isset($image['new_file'])) {
+                    //Remove duplicates.
+                    unset($mediaGallery['images'][$key]);
+                }
+            }
+            $data['product']['media_gallery'] = $mediaGallery;
+            $fields = [
+                'image',
+                'small_image',
+                'thumbnail',
+                'swatch_image',
+            ];
+            foreach ($fields as $field) {
+                $data['product'][$field] = $product->getData($field);
+            }
+        }
+
+        return $data;
     }
 }

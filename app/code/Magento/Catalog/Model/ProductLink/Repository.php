@@ -1,23 +1,22 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
 namespace Magento\Catalog\Model\ProductLink;
 
 use Magento\Catalog\Api\Data\ProductInterface;
-use Magento\Catalog\Api\Data\ProductLinkExtension;
 use Magento\Catalog\Api\Data\ProductLinkInterfaceFactory;
 use Magento\Catalog\Api\Data\ProductLinkExtensionFactory;
 use Magento\Catalog\Model\Product\Initialization\Helper\ProductLinks as LinksInitializer;
 use Magento\Catalog\Model\Product\LinkTypeProvider;
+use Magento\Framework\Api\SimpleDataObjectConverter;
 use Magento\Framework\Exception\CouldNotSaveException;
 use Magento\Framework\Exception\NoSuchEntityException;
-use Magento\Framework\Model\Entity\MetadataPool;
+use Magento\Framework\EntityManager\MetadataPool;
+use Magento\Framework\App\ObjectManager;
 
 /**
- * Class Repository
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
@@ -78,19 +77,15 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
     protected $productLinkExtensionFactory;
 
     /**
-     * Repository constructor.
+     * Constructor
      *
      * @param \Magento\Catalog\Api\ProductRepositoryInterface $productRepository
      * @param CollectionProvider $entityCollectionProvider
      * @param LinksInitializer $linkInitializer
      * @param Management $linkManagement
      * @param \Magento\Framework\Reflection\DataObjectProcessor $dataObjectProcessor
-     * @param \Magento\Catalog\Model\ResourceModel\Product\Relation $catalogProductRelation
-     * @param \Magento\Catalog\Model\ResourceModel\Product\Link $linkResource
-     * @param LinkTypeProvider $linkTypeProvider
-     * @param ProductLinkInterfaceFactory $productLinkFactory
-     * @param ProductLinkExtensionFactory $productLinkExtensionFactory
-     * @param MetadataPool $metadataPool
+     * @param \Magento\Catalog\Api\Data\ProductLinkInterfaceFactory|null $productLinkFactory
+     * @param \Magento\Catalog\Api\Data\ProductLinkExtensionFactory|null $productLinkExtensionFactory
      * @SuppressWarnings(PHPMD.ExcessiveParameterList)
      */
     public function __construct(
@@ -99,24 +94,18 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
         \Magento\Catalog\Model\Product\Initialization\Helper\ProductLinks $linkInitializer,
         \Magento\Catalog\Model\ProductLink\Management $linkManagement,
         \Magento\Framework\Reflection\DataObjectProcessor $dataObjectProcessor,
-        \Magento\Catalog\Model\ResourceModel\Product\Relation $catalogProductRelation,
-        \Magento\Catalog\Model\ResourceModel\Product\Link $linkResource,
-        LinkTypeProvider $linkTypeProvider,
-        ProductLinkInterfaceFactory $productLinkFactory,
-        ProductLinkExtensionFactory $productLinkExtensionFactory,
-        MetadataPool $metadataPool
+        \Magento\Catalog\Api\Data\ProductLinkInterfaceFactory $productLinkFactory = null,
+        \Magento\Catalog\Api\Data\ProductLinkExtensionFactory $productLinkExtensionFactory = null
     ) {
         $this->productRepository = $productRepository;
         $this->entityCollectionProvider = $entityCollectionProvider;
         $this->linkInitializer = $linkInitializer;
         $this->linkManagement = $linkManagement;
         $this->dataObjectProcessor = $dataObjectProcessor;
-        $this->catalogProductRelation = $catalogProductRelation;
-        $this->linkResource = $linkResource;
-        $this->linkTypeProvider = $linkTypeProvider;
-        $this->productLinkFactory = $productLinkFactory;
-        $this->productLinkExtensionFactory = $productLinkExtensionFactory;
-        $this->metadataPool = $metadataPool;
+        $this->productLinkFactory = $productLinkFactory ?: ObjectManager::getInstance()
+            ->get(\Magento\Catalog\Api\Data\ProductLinkInterfaceFactory::class);
+        $this->productLinkExtensionFactory = $productLinkExtensionFactory ?: ObjectManager::getInstance()
+            ->get(\Magento\Catalog\Api\Data\ProductLinkExtensionFactory::class);
     }
 
     /**
@@ -129,7 +118,7 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
         $links = [];
         $extensions = $this->dataObjectProcessor->buildOutputDataArray(
             $entity->getExtensionAttributes(),
-            'Magento\Catalog\Api\Data\ProductLinkExtensionInterface'
+            \Magento\Catalog\Api\Data\ProductLinkExtensionInterface::class
         );
         $extensions = is_array($extensions) ? $extensions : [];
         $data = $entity->__toArray();
@@ -141,10 +130,10 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
         $links[$linkedProduct->getId()] = $data;
 
         try {
-            $linkTypesToId = $this->linkTypeProvider->getLinkTypes();
-            $productData = $this->metadataPool->getHydrator(ProductInterface::class)->extract($product);
-            $this->linkResource->saveProductLinks(
-                $productData[$this->metadataPool->getMetadata(ProductInterface::class)->getLinkField()],
+            $linkTypesToId = $this->getLinkTypeProvider()->getLinkTypes();
+            $productData = $this->getMetadataPool()->getHydrator(ProductInterface::class)->extract($product);
+            $this->getLinkResource()->saveProductLinks(
+                $productData[$this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField()],
                 $links,
                 $linkTypesToId[$entity->getLinkType()]
             );
@@ -163,7 +152,7 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
     public function getList(\Magento\Catalog\Api\Data\ProductInterface $product)
     {
         $output = [];
-        $linkTypes = $this->linkTypeProvider->getLinkTypes();
+        $linkTypes = $this->getLinkTypeProvider()->getLinkTypes();
         foreach (array_keys($linkTypes) as $linkTypeName) {
             $collection = $this->entityCollectionProvider->getCollection($product, $linkTypeName);
             foreach ($collection as $item) {
@@ -177,12 +166,12 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
                 if (isset($item['custom_attributes'])) {
                     $productLinkExtension = $productLink->getExtensionAttributes();
                     if ($productLinkExtension === null) {
-                        $productLinkExtension = $this->productLinkExtensionFactory->create();
+                        $productLinkExtension = $this->productLinkExtensionFactory()->create();
                     }
                     foreach ($item['custom_attributes'] as $option) {
                         $name = $option['attribute_code'];
                         $value = $option['value'];
-                        $setterName = 'set'.ucfirst($name);
+                        $setterName = 'set' . SimpleDataObjectConverter::snakeCaseToUpperCamelCase($name);
                         // Check if setter exists
                         if (method_exists($productLinkExtension, $setterName)) {
                             call_user_func([$productLinkExtension, $setterName], $value);
@@ -203,10 +192,10 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
     {
         $linkedProduct = $this->productRepository->get($entity->getLinkedProductSku());
         $product = $this->productRepository->get($entity->getSku());
-        $linkTypesToId = $this->linkTypeProvider->getLinkTypes();
-        $productData = $this->metadataPool->getHydrator(ProductInterface::class)->extract($product);
-        $linkId = $this->linkResource->getProductLinkId(
-            $productData[$this->metadataPool->getMetadata(ProductInterface::class)->getLinkField()],
+        $linkTypesToId = $this->getLinkTypeProvider()->getLinkTypes();
+        $productData = $this->getMetadataPool()->getHydrator(ProductInterface::class)->extract($product);
+        $linkId = $this->getLinkResource()->getProductLinkId(
+            $productData[$this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField()],
             $linkedProduct->getId(),
             $linkTypesToId[$entity->getLinkType()]
         );
@@ -214,7 +203,7 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
         if (!$linkId) {
             throw new NoSuchEntityException(
                 __(
-                    'Product with SKU %1 is not linked to product with SKU %2',
+                    'Product with SKU \'%1\' is not linked to product with SKU \'%2\'',
                     $entity->getLinkedProductSku(),
                     $entity->getSku()
                 )
@@ -222,7 +211,7 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
         }
 
         try {
-            $this->linkResource->deleteProductLink($linkId);
+            $this->getLinkResource()->deleteProductLink($linkId);
         } catch (\Exception $exception) {
             throw new CouldNotSaveException(__('Invalid data provided for linked products'));
         }
@@ -251,5 +240,41 @@ class Repository implements \Magento\Catalog\Api\ProductLinkRepositoryInterface
                 ]
             )
         );
+    }
+
+    /**
+     * @return \Magento\Catalog\Model\ResourceModel\Product\Link
+     */
+    private function getLinkResource()
+    {
+        if (null === $this->linkResource) {
+            $this->linkResource = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Catalog\Model\ResourceModel\Product\Link::class);
+        }
+        return $this->linkResource;
+    }
+
+    /**
+     * @return LinkTypeProvider
+     */
+    private function getLinkTypeProvider()
+    {
+        if (null === $this->linkTypeProvider) {
+            $this->linkTypeProvider = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Catalog\Model\Product\LinkTypeProvider::class);
+        }
+        return $this->linkTypeProvider;
+    }
+
+    /**
+     * @return \Magento\Framework\EntityManager\MetadataPool
+     */
+    private function getMetadataPool()
+    {
+        if (null === $this->metadataPool) {
+            $this->metadataPool = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\EntityManager\MetadataPool::class);
+        }
+        return $this->metadataPool;
     }
 }

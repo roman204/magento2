@@ -1,23 +1,26 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Downloadable\Model\ResourceModel;
 
 use Magento\Catalog\Api\Data\ProductInterface;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\EntityManager\MetadataPool;
 
 /**
  * Downloadable Product  Samples resource model
  *
- * @author      Magento Core Team <core@magentocommerce.com>
+ * @api
+ * @since 100.0.2
  */
 class Link extends \Magento\Framework\Model\ResourceModel\Db\AbstractDb
 {
     /**
-     * @var \Magento\Framework\Model\Entity\MetadataPool
+     * @var MetadataPool
      */
-    protected $metadataPool;
+    private $metadataPool;
 
     /**
      * Catalog data
@@ -47,7 +50,6 @@ class Link extends \Magento\Framework\Model\ResourceModel\Db\AbstractDb
      * @param \Magento\Framework\App\Config\ScopeConfigInterface $configuration
      * @param \Magento\Directory\Model\CurrencyFactory $currencyFactory
      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
-     * @param \Magento\Framework\Model\Entity\MetadataPool $metadataPool
      * @param string $connectionName
      */
     public function __construct(
@@ -56,14 +58,12 @@ class Link extends \Magento\Framework\Model\ResourceModel\Db\AbstractDb
         \Magento\Framework\App\Config\ScopeConfigInterface $configuration,
         \Magento\Directory\Model\CurrencyFactory $currencyFactory,
         \Magento\Store\Model\StoreManagerInterface $storeManager,
-        \Magento\Framework\Model\Entity\MetadataPool $metadataPool,
         $connectionName = null
     ) {
         $this->_catalogData = $catalogData;
         $this->_configuration = $configuration;
         $this->_currencyFactory = $currencyFactory;
         $this->_storeManager = $storeManager;
-        $this->metadataPool = $metadataPool;
         parent::__construct($context, $connectionName);
     }
 
@@ -212,7 +212,7 @@ class Link extends \Magento\Framework\Model\ResourceModel\Db\AbstractDb
             ['cpe' => $this->getTable('catalog_product_entity')],
             sprintf(
                 'cpe.entity_id = m.product_id',
-                $this->metadataPool->getMetadata(ProductInterface::class)->getLinkField()
+                $this->getMetadataPool()->getMetadata(ProductInterface::class)->getLinkField()
             ),
             []
         )->joinLeft(
@@ -233,5 +233,17 @@ class Link extends \Magento\Framework\Model\ResourceModel\Db\AbstractDb
     protected function _createCurrency()
     {
         return $this->_currencyFactory->create();
+    }
+
+    /**
+     * Get MetadataPool instance
+     * @return MetadataPool
+     */
+    private function getMetadataPool()
+    {
+        if (!$this->metadataPool) {
+            $this->metadataPool = ObjectManager::getInstance()->get(MetadataPool::class);
+        }
+        return $this->metadataPool;
     }
 }

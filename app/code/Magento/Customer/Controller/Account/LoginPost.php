@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Controller\Account;
@@ -13,6 +13,7 @@ use Magento\Customer\Model\Url as CustomerUrl;
 use Magento\Framework\Exception\EmailNotConfirmedException;
 use Magento\Framework\Exception\AuthenticationException;
 use Magento\Framework\Data\Form\FormKey\Validator;
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\Exception\State\UserLockedException;
 use Magento\Framework\App\Config\ScopeConfigInterface;
 
@@ -21,10 +22,14 @@ use Magento\Framework\App\Config\ScopeConfigInterface;
  */
 class LoginPost extends \Magento\Customer\Controller\AbstractAccount
 {
-    /** @var AccountManagementInterface */
+    /**
+     * @var \Magento\Customer\Api\AccountManagementInterface
+     */
     protected $customerAccountManagement;
 
-    /** @var Validator */
+    /**
+     * @var \Magento\Framework\Data\Form\FormKey\Validator
+     */
     protected $formKeyValidator;
 
     /**
@@ -41,6 +46,16 @@ class LoginPost extends \Magento\Customer\Controller\AbstractAccount
      * @var ScopeConfigInterface
      */
     private $scopeConfig;
+
+    /**
+     * @var \Magento\Framework\Stdlib\Cookie\CookieMetadataFactory
+     */
+    private $cookieMetadataFactory;
+
+    /**
+     * @var \Magento\Framework\Stdlib\Cookie\PhpCookieManager
+     */
+    private $cookieMetadataManager;
 
     /**
      * @param Context $context
@@ -67,32 +82,52 @@ class LoginPost extends \Magento\Customer\Controller\AbstractAccount
     }
 
     /**
-     * Set scope config
-     *
-     * @param ScopeConfigInterface $scopeConfig
-     * @return void
-     * @deprecated
-     */
-    public function setScopeConfig(ScopeConfigInterface $scopeConfig)
-    {
-        $this->scopeConfig = $scopeConfig;
-    }
-
-    /**
      * Get scope config
      *
      * @return ScopeConfigInterface
-     * @deprecated
+     * @deprecated 100.0.10
      */
-    public function getScopeConfig()
+    private function getScopeConfig()
     {
         if (!($this->scopeConfig instanceof \Magento\Framework\App\Config\ScopeConfigInterface)) {
             return \Magento\Framework\App\ObjectManager::getInstance()->get(
-                'Magento\Framework\App\Config\ScopeConfigInterface'
+                \Magento\Framework\App\Config\ScopeConfigInterface::class
             );
         } else {
             return $this->scopeConfig;
         }
+    }
+
+    /**
+     * Retrieve cookie manager
+     *
+     * @deprecated 100.1.0
+     * @return \Magento\Framework\Stdlib\Cookie\PhpCookieManager
+     */
+    private function getCookieManager()
+    {
+        if (!$this->cookieMetadataManager) {
+            $this->cookieMetadataManager = \Magento\Framework\App\ObjectManager::getInstance()->get(
+                \Magento\Framework\Stdlib\Cookie\PhpCookieManager::class
+            );
+        }
+        return $this->cookieMetadataManager;
+    }
+
+    /**
+     * Retrieve cookie metadata factory
+     *
+     * @deprecated 100.1.0
+     * @return \Magento\Framework\Stdlib\Cookie\CookieMetadataFactory
+     */
+    private function getCookieMetadataFactory()
+    {
+        if (!$this->cookieMetadataFactory) {
+            $this->cookieMetadataFactory = \Magento\Framework\App\ObjectManager::getInstance()->get(
+                \Magento\Framework\Stdlib\Cookie\CookieMetadataFactory::class
+            );
+        }
+        return $this->cookieMetadataFactory;
     }
 
     /**
@@ -117,30 +152,43 @@ class LoginPost extends \Magento\Customer\Controller\AbstractAccount
                     $customer = $this->customerAccountManagement->authenticate($login['username'], $login['password']);
                     $this->session->setCustomerDataAsLoggedIn($customer);
                     $this->session->regenerateId();
+                    if ($this->getCookieManager()->getCookie('mage-cache-sessid')) {
+                        $metadata = $this->getCookieMetadataFactory()->createCookieMetadata();
+                        $metadata->setPath('/');
+                        $this->getCookieManager()->deleteCookie('mage-cache-sessid', $metadata);
+                    }
+                    $redirectUrl = $this->accountRedirect->getRedirectCookie();
+                    if (!$this->getScopeConfig()->getValue('customer/startup/redirect_dashboard') && $redirectUrl) {
+                        $this->accountRedirect->clearRedirectCookie();
+                        $resultRedirect = $this->resultRedirectFactory->create();
+                        // URL is checked to be internal in $this->_redirect->success()
+                        $resultRedirect->setUrl($this->_redirect->success($redirectUrl));
+                        return $resultRedirect;
+                    }
                 } catch (EmailNotConfirmedException $e) {
                     $value = $this->customerUrl->getEmailConfirmationUrl($login['username']);
                     $message = __(
                         'This account is not confirmed. <a href="%1">Click here</a> to resend confirmation email.',
                         $value
                     );
-                    $this->messageManager->addError($message);
-                    $this->session->setUsername($login['username']);
                 } catch (UserLockedException $e) {
                     $message = __(
-                        'The account is locked. Please wait and try again or contact %1.',
-                        $this->getScopeConfig()->getValue('contact/email/recipient_email')
+                        'You did not sign in correctly or your account is temporarily disabled.'
                     );
-                    $this->messageManager->addError($message);
-                    $this->session->setUsername($login['username']);
                 } catch (AuthenticationException $e) {
-                    $message = __('Invalid login or password.');
-                    $this->messageManager->addError($message);
-                    $this->session->setUsername($login['username']);
+                    $message = __('You did not sign in correctly or your account is temporarily disabled.');
+                } catch (LocalizedException $e) {
+                    $message = $e->getMessage();
                 } catch (\Exception $e) {
                     // PA DSS violation: throwing or logging an exception here can disclose customer password
                     $this->messageManager->addError(
                         __('An unspecified error occurred. Please contact us for assistance.')
                     );
+                } finally {
+                    if (isset($message)) {
+                        $this->messageManager->addError($message);
+                        $this->session->setUsername($login['username']);
+                    }
                 }
             } else {
                 $this->messageManager->addError(__('A login and a password are required.'));

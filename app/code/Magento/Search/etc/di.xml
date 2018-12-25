@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <!--
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 -->
@@ -49,6 +49,7 @@
             </argument>
         </arguments>
     </type>
+    <!-- @api -->
     <virtualType name="Magento\Search\Model\ResourceModel\Synonyms\Grid\Collection" type="Magento\Framework\View\Element\UiComponent\DataProvider\SearchResult">
         <arguments>
             <argument name="name" xsi:type="string">search_synonyms_grid_data_source</argument>
@@ -67,11 +68,11 @@
     </type>
     <preference for="Magento\Search\Api\Data\SynonymGroupInterface" type="Magento\Search\Model\SynonymGroup" />
     <preference for="Magento\Search\Api\SynonymGroupRepositoryInterface" type="Magento\Search\Model\SynonymGroupRepository" />
-    <preference for="Magento\Framework\Search\Adapter\Preprocessor\PreprocessorInterface" type="Magento\Search\Adapter\Mysql\Query\Preprocessor\Synonyms" />
+    <preference for="Magento\Framework\Search\Adapter\Preprocessor\PreprocessorInterface" type="Magento\Search\Adapter\Query\Preprocessor\Synonyms" />
     <type name="Magento\Framework\Search\Adapter\Mysql\Query\Builder\Match">
         <arguments>
             <argument name="preprocessors" xsi:type="array">
-                <item name="synonymsPreprocessor" xsi:type="object">Magento\Search\Adapter\Mysql\Query\Preprocessor\Synonyms</item>
+                <item name="synonymsPreprocessor" xsi:type="object">Magento\Search\Adapter\Query\Preprocessor\Synonyms</item>
             </argument>
         </arguments>
     </type>
@@ -80,8 +81,5 @@
         <arguments>
             <argument name="dataStorage" xsi:type="object">Magento\Search\Model\SearchEngine\Config\Data</argument>
         </arguments>
-    </type>
-    <type name="Magento\Backend\Model\Menu\Builder">
-        <plugin name="SearchTermMenuBuilder" type="Magento\Search\Model\SearchEngine\MenuBuilder" />
     </type>
 </config>

@@ -1,13 +1,11 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Test\Unit\Ui\DataProvider\Product\Form\Modifier;
 
 use Magento\Catalog\Model\Product\Type;
-use Magento\Catalog\Model\AttributeConstantsInterface;
-use Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\General;
 
 /**
  * @method \Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Images getModel
@@ -26,47 +24,9 @@ class ImagesTest extends AbstractModifierTest
 
     public function testModifyData()
     {
-        $productId = 1;
-        $modelId = 1;
-
-        $data = [
-            $modelId => [
-                \Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\General::DATA_SOURCE_DEFAULT => [
-                    AttributeConstantsInterface::CODE_SKU => 'product_42',
-                    AttributeConstantsInterface::CODE_PRICE => '42.00',
-                    AttributeConstantsInterface::CODE_STATUS => '1',
-                    \Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Images::CODE_MEDIA_GALLERY => [
-                        'images' => [
-                            [
-                                'value_id' => '1',
-                                'file' => 'filename.jpg',
-                                'media_type' => 'image',
-                            ]
-                        ]
-                    ],
-                    \Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Images::CODE_IMAGE => 'filename.jpg',
-                    \Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Images::CODE_SMALL_IMAGE => 'filename.jpg',
-                    \Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Images::CODE_THUMBNAIL => 'filename.jpg',
-                    \Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\Images::CODE_SWATCH_IMAGE => 'filename.jpg',
-                ]
-            ]
-        ];
-
-        $expectedData = [
-            $modelId => [
-                General::DATA_SOURCE_DEFAULT => [
-                    AttributeConstantsInterface::CODE_SKU => 'product_42',
-                    AttributeConstantsInterface::CODE_PRICE => '42.00',
-                    AttributeConstantsInterface::CODE_STATUS => '1',
-                ]
-            ]
-        ];
-
-        $this->productMock->expects($this->once())
-            ->method('getId')
-            ->willReturn($productId);
-
-        $this->assertSame($expectedData, $this->getModel()->modifyData($data));
+        $this->productMock->expects($this->once())->method('getId')->willReturn(2051);
+        $actualResult = $this->getModel()->modifyData($this->getSampleData());
+        $this->assertSame("", $actualResult[2051]['product']['media_gallery']['images'][0]['label']);
     }
 
     public function testModifyMeta()
@@ -81,5 +41,25 @@ class ImagesTest extends AbstractModifierTest
         ];
 
         $this->assertSame([], $this->getModel()->modifyMeta($meta));
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function getSampleData()
+    {
+        return [
+            2051 => [
+                'product' => [
+                    'media_gallery' => [
+                        'images' => [
+                            [
+                                'label' => null
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
     }
 }

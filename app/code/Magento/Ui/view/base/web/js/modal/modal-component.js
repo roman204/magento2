@@ -1,8 +1,11 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/**
+ * @api
+ */
 define([
     'Magento_Ui/js/lib/view/utils/async',
     'uiCollection',
@@ -18,6 +21,7 @@ define([
             title: '',
             subTitle: '',
             options: {
+                modalClass: '',
                 title: '',
                 subTitle: '',
                 buttons: [],
@@ -73,9 +77,11 @@ define([
          * @returns {Object} Chainable.
          */
         initSelector: function () {
+            var modalClass = this.name.replace(/\./g, '_');
+
             this.contentSelector = '.' + this.modalClass;
-            this.options.modalClass = this.name.replace(/\./g, '_');
-            this.rootSelector = '.' + this.options.modalClass;
+            this.options.modalClass = this.options.modalClass + ' ' + modalClass;
+            this.rootSelector = '.' + modalClass;
 
             return this;
         },
@@ -105,7 +111,7 @@ define([
          * Init toolbar section so other components will be able to place something in it
          */
         initToolbarSection: function () {
-            this.set('toolbarSection', this.modal.data('modal').modal.find('header').get(0));
+            this.set('toolbarSection', this.modal.data('mage-modal').modal.find('header').get(0));
         },
 
         /**
@@ -284,14 +290,15 @@ define([
          */
         triggerAction: function (action) {
             var targetName = action.targetName,
-                params = action.params,
+                params = action.params || [],
                 actionName = action.actionName,
                 target;
 
             target = registry.async(targetName);
 
             if (target && typeof target === 'function' && actionName) {
-                target(actionName, params);
+                params.unshift(actionName);
+                target.apply(target, params);
             }
         },
 

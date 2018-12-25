@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Model\ResourceModel\Product\Compare\Item;
@@ -8,9 +8,11 @@ namespace Magento\Catalog\Model\ResourceModel\Product\Compare\Item;
 /**
  * Catalog Product Compare Items Resource Collection
  *
+ * @api
  * @author      Magento Core Team <core@magentocommerce.com>
  * @SuppressWarnings(PHPMD.LongVariable)
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ * @since 100.0.2
  */
 class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
 {
@@ -70,7 +72,6 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
      * @param \Magento\Customer\Model\Session $customerSession
      * @param \Magento\Framework\Stdlib\DateTime $dateTime
      * @param \Magento\Customer\Api\GroupManagementInterface $groupManagement
-     * @param \Magento\Catalog\Model\ResourceModel\Product\Collection\ProductLimitation $productLimitation
      * @param \Magento\Catalog\Model\ResourceModel\Product\Compare\Item $catalogProductCompareItem
      * @param \Magento\Catalog\Helper\Product\Compare $catalogProductCompare
      * @param \Magento\Framework\DB\Adapter\AdapterInterface $connection
@@ -97,7 +98,6 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
         \Magento\Customer\Model\Session $customerSession,
         \Magento\Framework\Stdlib\DateTime $dateTime,
         \Magento\Customer\Api\GroupManagementInterface $groupManagement,
-        \Magento\Catalog\Model\ResourceModel\Product\Collection\ProductLimitation $productLimitation,
         \Magento\Catalog\Model\ResourceModel\Product\Compare\Item $catalogProductCompareItem,
         \Magento\Catalog\Helper\Product\Compare $catalogProductCompare,
         \Magento\Framework\DB\Adapter\AdapterInterface $connection = null
@@ -124,7 +124,6 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
             $customerSession,
             $dateTime,
             $groupManagement,
-            $productLimitation,
             $connection
         );
     }
@@ -136,7 +135,10 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
      */
     protected function _construct()
     {
-        $this->_init('Magento\Catalog\Model\Product\Compare\Item', 'Magento\Catalog\Model\ResourceModel\Product');
+        $this->_init(
+            \Magento\Catalog\Model\Product\Compare\Item::class,
+            \Magento\Catalog\Model\ResourceModel\Product::class
+        );
         $this->_initTables();
     }
 
@@ -363,7 +365,7 @@ class Collection extends \Magento\Catalog\Model\ResourceModel\Product\Collection
      */
     public function useProductItem()
     {
-        $this->setObject('Magento\Catalog\Model\Product');
+        $this->setObject(\Magento\Catalog\Model\Product::class);
 
         $this->setFlag('url_data_object', true);
         $this->setFlag('do_not_use_category_id', true);

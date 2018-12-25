@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -12,17 +12,23 @@ namespace Magento\Downloadable\Model\Product;
 /**
  * Test for \Magento\Downloadable\Model\Product\Type
  */
-class TypeTest extends \PHPUnit_Framework_TestCase
+class TypeTest extends \PHPUnit\Framework\TestCase
 {
     /**
      * @var \Magento\Downloadable\Model\Product\Type
      */
     protected $_model;
 
+    /**
+     * @var \Magento\Framework\ObjectManagerInterface
+     */
+    private $objectManager;
+
     protected function setUp()
     {
-        $this->_model = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
-            'Magento\Downloadable\Model\Product\Type'
+        $this->objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
+        $this->_model = $this->objectManager->create(
+            \Magento\Downloadable\Model\Product\Type::class
         );
     }
 
@@ -33,7 +39,7 @@ class TypeTest extends \PHPUnit_Framework_TestCase
     public function testDeleteTypeSpecificData()
     {
         $product = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
-            'Magento\Catalog\Model\Product'
+            \Magento\Catalog\Model\Product::class
         );
         $product->load(1);
         $product->setOrigData();
@@ -56,7 +62,7 @@ class TypeTest extends \PHPUnit_Framework_TestCase
         $product->setDownloadableData($downloadableData);
         $this->_model->deleteTypeSpecificData($product);
         $product = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
-            'Magento\Catalog\Model\Product'
+            \Magento\Catalog\Model\Product::class
         );
         $product->load(1);
 
@@ -77,7 +83,7 @@ class TypeTest extends \PHPUnit_Framework_TestCase
     {
         $objectManager = \Magento\TestFramework\Helper\Bootstrap::getObjectManager();
         $product = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
-            'Magento\Catalog\Model\Product'
+            \Magento\Catalog\Model\Product::class
         );
         $product->load(1);
         $product->setOrigData();
@@ -107,21 +113,30 @@ class TypeTest extends \PHPUnit_Framework_TestCase
         }
 
         $product->setDownloadableData($downloadableData);
-        $sampleFactory = $objectManager->create('Magento\Downloadable\Api\Data\SampleInterfaceFactory');
-        $linkFactory = $objectManager->create('Magento\Downloadable\Api\Data\LinkInterfaceFactory');
+        $sampleFactory = $objectManager->create(\Magento\Downloadable\Api\Data\SampleInterfaceFactory::class);
+        $linkFactory = $objectManager->create(\Magento\Downloadable\Api\Data\LinkInterfaceFactory::class);
         $extension = $product->getExtensionAttributes();
+        $expectedLink = [
+            'is_shareable' => '2',
+            'link_type' => 'file',
+            'link_file' => '/j/e/jellyfish_2_4.jpg',
+            'number_of_downloads' => '15',
+            'price' => '15.0000',
+            'sample_type' => 'file',
+            'sort_order' => '1',
+            'title' => 'Updated downloadable link #1',
+        ];
         $links = [];
         foreach ($downloadableData['link'] as $linkData) {
             if (!$linkData || (isset($linkData['is_delete']) && (bool)$linkData['is_delete'])) {
                 continue;
             } else {
-                unset($linkData['link_id']);
-                // TODO: need to implement setLinkFileContent()
                 $link = $linkFactory->create(['data' => $linkData]);
-                $link->setId(null);
+                $link->setId($linkData['link_id']);
                 if (isset($linkData['sample'])) {
                     $link->setSampleType($linkData['sample']['type']);
                     $link->setSampleFileData($linkData['sample']['file']);
+                    $expectedLink['sample_file'] = $linkData['sample']['file'];
                     $link->setSampleUrl($linkData['sample']['url']);
                 }
                 $link->setLinkType($linkData['type']);
@@ -149,9 +164,8 @@ class TypeTest extends \PHPUnit_Framework_TestCase
                 if (!$sampleData || (isset($sampleData['is_delete']) && (bool)$sampleData['is_delete'])) {
                     continue;
                 } else {
-                    unset($sampleData['sample_id']);
                     $sample = $sampleFactory->create(['data' => $sampleData]);
-                    $sample->setId(null);
+                    $sample->setId($sampleData['sample_id']);
                     $sample->setStoreId($product->getStoreId());
                     $sample->setSampleType($sampleData['type']);
                     $sample->setSampleUrl($sampleData['sample_url']);
@@ -171,26 +185,13 @@ class TypeTest extends \PHPUnit_Framework_TestCase
             $product->setTypeHasRequiredOptions(false)->setRequiredOptions(false);
         }
 
-
-
         $product->save();
         /** @var \Magento\Catalog\Model\Product $product */
         $product = \Magento\TestFramework\Helper\Bootstrap::getObjectManager()->create(
-            'Magento\Catalog\Model\Product'
+            \Magento\Catalog\Model\Product::class
         );
         $product->load(1);
 
-        $expectedLink = [
-            'is_shareable' => '2',
-            'link_type' => 'file',
-            'link_file' => '/j/e/jellyfish_2_4.jpg',
-            'number_of_downloads' => '15',
-            'price' => '15.0000',
-            'sample_file' => '/n/d/jellyfish_1_3.jpg',
-            'sample_type' => 'file',
-            'sort_order' => '1',
-            'title' => 'Updated downloadable link #1',
-        ];
         $links = $product->getExtensionAttributes()->getDownloadableProductLinks();
 
         $this->assertNotEmpty($links);
@@ -220,5 +221,38 @@ class TypeTest extends \PHPUnit_Framework_TestCase
             $this->assertArrayHasKey($key, $sample);
             $this->assertEquals($value, $sample[$key]);
         }
+    }
+
+    /**
+     * @magentoAppIsolation enabled
+     * @magentoDbIsolation enabled
+     * @magentoDataFixture Magento/Downloadable/_files/product_downloadable.php
+     * @covers \Magento\Downloadable\Model\Product\Type::checkProductBuyState()
+     */
+    public function testCheckProductBuyState()
+    {
+        /** @var \Magento\Catalog\Api\ProductRepositoryInterface $productRepository */
+        $productRepository =$this->objectManager->create(
+            \Magento\Catalog\Api\ProductRepositoryInterface::class
+        );
+        $product = $productRepository->get('downloadable-product');
+        $product->setLinksPurchasedSeparately(false);
+        $productRepository->save($product);
+        /** @var \Magento\Quote\Model\Quote\Item\Option $option */
+        $option = $this->objectManager->create(
+            \Magento\Quote\Model\Quote\Item\Option::class,
+            ['data' => ['code' => 'info_buyRequest', 'value' => '{"qty":23}']]
+        );
+        $option->setProduct($product);
+        $product->setCustomOptions(['info_buyRequest' => $option]);
+
+        $this->_model->checkProductBuyState($product);
+        $linksFactory = $this->objectManager
+            ->get(\Magento\Downloadable\Model\ResourceModel\Link\CollectionFactory::class);
+        $allLinksIds = $linksFactory->create()->addProductToFilter($product->getEntityId())->getAllIds();
+        $this->assertEquals(
+            '{"qty":23,"links":["' . implode('","', $allLinksIds). '"]}',
+            $product->getCustomOption('info_buyRequest')->getValue()
+        );
     }
 }

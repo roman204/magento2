@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -20,14 +20,14 @@ class Option extends Form
      *
      * @var string
      */
-    protected $searchGridBlock = ".product_form_product_form_bundle_data_modal";
+    protected $searchGridBlock = ".product_form_product_form_bundle-items_modal";
 
     /**
      * Added product row.
      *
      * @var string
      */
-    protected $selectionBlock = '[data-index="bundle_selections"] tbody tr:nth-child(%d)';
+    protected $selectionBlock = '[data-index="bundle_selections"] > tbody > tr:nth-child(%d)';
 
     /**
      * Selector for 'Add Products to Option' button.
@@ -51,7 +51,7 @@ class Option extends Form
     protected function getSearchGridBlock()
     {
         return $this->blockFactory->create(
-            'Magento\Bundle\Test\Block\Adminhtml\Catalog\Product\Edit\Section\Bundle\Option\Search\Grid',
+            \Magento\Bundle\Test\Block\Adminhtml\Catalog\Product\Edit\Section\Bundle\Option\Search\Grid::class,
             ['element' => $this->browser->find($this->searchGridBlock)]
         );
     }
@@ -65,7 +65,7 @@ class Option extends Form
     protected function getSelectionBlock($rowIndex)
     {
         return $this->blockFactory->create(
-            'Magento\Bundle\Test\Block\Adminhtml\Catalog\Product\Edit\Section\Bundle\Option\Selection',
+            \Magento\Bundle\Test\Block\Adminhtml\Catalog\Product\Edit\Section\Bundle\Option\Selection::class,
             ['element' => $this->_rootElement->find(sprintf($this->selectionBlock, ++$rowIndex))]
         );
     }
@@ -106,7 +106,7 @@ class Option extends Form
         $mapping = $this->dataMapping($fields);
         $newField = $this->_getData($mapping);
         foreach ($fields['assigned_products'] as $key => $field) {
-            $newField['assigned_products'][$key] = $this->getSelectionBlock($key + 1)->getProductRow($field['data']);
+            $newField['assigned_products'][$key] = $this->getSelectionBlock($key)->getProductRow($field['data']);
         }
         return $newField;
     }

@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Ui\Component\Form\Element;
@@ -9,12 +9,14 @@ use Magento\Framework\Data\OptionSourceInterface;
 use Magento\Framework\View\Element\UiComponent\ContextInterface;
 
 /**
- * Class AbstractOptionsField
+ * @api
+ * @since 100.1.0
  */
 abstract class AbstractOptionsField extends AbstractElement
 {
     /**
      * @var array|OptionSourceInterface|null
+     * @since 100.1.0
      */
     protected $options;
 
@@ -40,6 +42,7 @@ abstract class AbstractOptionsField extends AbstractElement
      * Prepare component configuration
      *
      * @return void
+     * @since 100.1.0
      */
     public function prepare()
     {
@@ -53,8 +56,10 @@ abstract class AbstractOptionsField extends AbstractElement
             } else {
                 $options = array_values($this->options);
             }
-            $options = $this->convertOptionsValueToString($options);
-            $config['options'] = array_values(array_merge_recursive($options, $config['options']));
+            if (empty($config['rawOptions'])) {
+                $options = $this->convertOptionsValueToString($options);
+            }
+            $config['options'] = array_values(array_merge_recursive($config['options'], $options));
         }
         $this->setData('config', (array)$config);
         parent::prepare();
@@ -66,17 +71,16 @@ abstract class AbstractOptionsField extends AbstractElement
      * @param string $optionValue
      * @return bool
      * @SuppressWarnings(PHPMD.BooleanGetMethodName)
+     * @since 100.1.0
      */
-    public function getIsSelected($optionValue)
-    {
-        return $this->getValue() == $optionValue;
-    }
+    abstract public function getIsSelected($optionValue);
 
     /**
      * Convert options value to string
      *
      * @param array $options
      * @return array
+     * @since 100.1.0
      */
     protected function convertOptionsValueToString(array $options)
     {

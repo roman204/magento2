@@ -1,15 +1,20 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
-
 namespace Magento\SalesRule\Test\Unit\Model\ResourceModel;
 
-use Magento\SalesRule\Api\Data\RuleInterface;
-
-class RuleTest extends \PHPUnit_Framework_TestCase
+/**
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ */
+class RuleTest extends \PHPUnit\Framework\TestCase
 {
+    /**
+     * @var \Magento\Framework\TestFramework\Unit\Helper\ObjectManager
+     */
+    private $objectManager;
+
     /**
      * @var \Magento\SalesRule\Model\ResourceModel\Rule
      */
@@ -48,30 +53,38 @@ class RuleTest extends \PHPUnit_Framework_TestCase
     /**
      * @var \PHPUnit_Framework_MockObject_MockObject
      */
+    protected $rule;
+
+    /**
+     * @var \PHPUnit_Framework_MockObject_MockObject
+     */
     protected $relationProcessorMock;
 
-    public function setUp()
+    protected function setUp()
     {
-        $objectManager = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
-        $this->ruleResource = $this->getMockBuilder('Magento\SalesRule\Model\ResourceModel\Rule')
+        $this->objectManager = new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this);
+        $this->rule = $this->getMockBuilder(\Magento\SalesRule\Model\Rule::class)
+            ->disableOriginalConstructor()
+            ->getMock();
+        $this->ruleResource = $this->getMockBuilder(\Magento\SalesRule\Model\ResourceModel\Rule::class)
             ->disableOriginalConstructor()
             ->getMock();
 
-        $context = $this->getMockBuilder('Magento\Framework\Model\ResourceModel\Db\Context')
+        $context = $this->getMockBuilder(\Magento\Framework\Model\ResourceModel\Db\Context::class)
             ->disableOriginalConstructor()
             ->getMock();
         $connectionName = 'test';
-        $this->resourcesMock = $this->getMockBuilder('Magento\Framework\App\ResourceConnection')
+        $this->resourcesMock = $this->getMockBuilder(\Magento\Framework\App\ResourceConnection::class)
             ->disableOriginalConstructor()
             ->getMock();
 
         $this->relationProcessorMock =
-            $this->getMockBuilder('Magento\Framework\Model\ResourceModel\Db\ObjectRelationProcessor')
+            $this->getMockBuilder(\Magento\Framework\Model\ResourceModel\Db\ObjectRelationProcessor::class)
             ->disableOriginalConstructor()
             ->getMock();
 
         $this->transactionManagerMock =
-            $this->getMockBuilder('Magento\Framework\Model\ResourceModel\Db\TransactionManagerInterface')
+            $this->getMockBuilder(\Magento\Framework\Model\ResourceModel\Db\TransactionManagerInterface::class)
             ->disableOriginalConstructor()
             ->getMock();
 
@@ -79,12 +92,12 @@ class RuleTest extends \PHPUnit_Framework_TestCase
             ->method('getResources')
             ->willReturn($this->resourcesMock);
 
-        $this->entityManager = $this->getMockBuilder('Magento\Framework\Model\EntityManager')
+        $this->entityManager = $this->getMockBuilder(\Magento\Framework\EntityManager\EntityManager::class)
             ->setMethods(['load', 'save', 'delete'])
             ->disableOriginalConstructor()
             ->getMock();
 
-        $this->adapter = $this->getMockBuilder('Magento\Framework\DB\Adapter\AdapterInterface')
+        $this->adapter = $this->getMockBuilder(\Magento\Framework\DB\Adapter\AdapterInterface::class)
             ->disableOriginalConstructor()
             ->getMock();
         $this->resourcesMock->expects($this->any())
@@ -102,30 +115,35 @@ class RuleTest extends \PHPUnit_Framework_TestCase
             ->method('getTransactionManager')
             ->willReturn($this->transactionManagerMock);
 
-        $this->select = $this->getMockBuilder('Magento\Framework\DB\Select')
+        $this->select = $this->getMockBuilder(\Magento\Framework\DB\Select::class)
             ->disableOriginalConstructor()
             ->getMock();
 
-        $associatedEntitiesMap = [
-            'customer_group' => [
-                'associations_table' => 'salesrule_customer_group',
-                'rule_id_field' => 'rule_id',
-                'entity_id_field' => 'customer_group_id'
-            ],
-            'website' => [
-                'associations_table' => 'salesrule_website',
-                'rule_id_field' => 'rule_id',
-                'entity_id_field' => 'website_id'
-            ],
-        ];
+        $associatedEntitiesMap = $this->createPartialMock(\Magento\Framework\DataObject::class, ['getData']);
+        $associatedEntitiesMap->expects($this->once())
+            ->method('getData')
+            ->willReturn(
+                [
+                    'customer_group' => [
+                        'associations_table' => 'salesrule_customer_group',
+                        'rule_id_field' => 'rule_id',
+                        'entity_id_field' => 'customer_group_id'
+                    ],
+                    'website' => [
+                        'associations_table' => 'salesrule_website',
+                        'rule_id_field' => 'rule_id',
+                        'entity_id_field' => 'website_id'
+                    ],
+                ]
+            );
 
-        $this->model = $objectManager->getObject(
-            'Magento\SalesRule\Model\ResourceModel\Rule',
+        $this->model = $this->objectManager->getObject(
+            \Magento\SalesRule\Model\ResourceModel\Rule::class,
             [
                 'context' => $context,
                 'connectionName' => $connectionName,
-                'associatedEntitiesMap' => $associatedEntitiesMap,
                 'entityManager' => $this->entityManager,
+                'associatedEntityMapInstance' => $associatedEntitiesMap
             ]
         );
     }
@@ -137,211 +155,87 @@ class RuleTest extends \PHPUnit_Framework_TestCase
     {
         $ruleId = 1;
         /** @var \Magento\Framework\Model\AbstractModel|\PHPUnit_Framework_MockObject_MockObject $abstractModel */
-        $abstractModel = $this->getMockBuilder('Magento\Framework\Model\AbstractModel')
+        $abstractModel = $this->getMockBuilder(\Magento\Framework\Model\AbstractModel::class)
             ->disableOriginalConstructor()
             ->getMockForAbstractClass();
         $this->entityManager->expects($this->once())
             ->method('load')
-            ->with(RuleInterface::class, $abstractModel, $ruleId);
+            ->with($abstractModel, $ruleId);
         $result = $this->model->load($abstractModel, $ruleId);
         $this->assertSame($this->model, $result);
     }
 
     public function testSave()
     {
-        $connectionMock = $this->getMock('\Magento\Framework\DB\Adapter\AdapterInterface', [], [], '', false);
-        $resourceMock = $this->getMock(
-            'Magento\Framework\Model\ResourceModel\Db\AbstractDb',
-            [
-                '_construct',
-                'getConnection',
-                '__wakeup',
-                'getIdFieldName'
-            ],
-            [],
-            '',
-            false
-        );
-        $connectionInterfaceMock = $this->getMock('Magento\Framework\DB\Adapter\AdapterInterface', [], [], '', false);
-        $resourceMock->expects($this->any())
-            ->method('getConnection')
-            ->will($this->returnValue($connectionInterfaceMock));
-        $data = 'tableName';
-        $this->resourcesMock->expects($this->any())
-            ->method('getConnection')
-            ->will($this->returnValue($connectionMock));
-        $this->resourcesMock->expects($this->any())->method('getTableName')->with($data)->will(
-            $this->returnValue('tableName')
-        );
-        $mainTableReflection = new \ReflectionProperty(
-            'Magento\Framework\Model\ResourceModel\Db\AbstractDb',
-            '_mainTable'
-        );
-        $mainTableReflection->setAccessible(true);
-        $mainTableReflection->setValue($this->model, 'tableName');
-        $idFieldNameReflection = new \ReflectionProperty(
-            'Magento\Framework\Model\ResourceModel\Db\AbstractDb',
-            '_idFieldName'
-        );
-        $idFieldNameReflection->setAccessible(true);
-        $idFieldNameReflection->setValue($this->model, 'idFieldName');
-        $connectionMock->expects($this->any())->method('save')->with('tableName', 'idFieldName');
-        $connectionMock->expects($this->any())->method('quoteInto')->will($this->returnValue('idFieldName'));
-
-        $abstractModelMock = $this->setupAbstractModel($resourceMock);
-        $abstractModelMock->setIdFieldName('id');
-        $abstractModelMock->setData(
-            [
-                'id'    => 12345,
-                'name'  => 'Test Name',
-                'value' => 'Test Value'
-            ]
-        );
-        $abstractModelMock->afterLoad();
-        $this->assertEquals($abstractModelMock->getData(), $abstractModelMock->getStoredData());
-        $newData = ['value' => 'Test Value New'];
-        $abstractModelMock->addData($newData);
-        $this->assertNotEquals($abstractModelMock->getData(), $abstractModelMock->getStoredData());
-        $abstractModelMock->isObjectNew(false);
-        $connectionMock->expects($this->any())
-            ->method('update')
-            ->with(
-                'tableName',
-                $newData,
-                'idFieldName'
-            );
-        $this->relationProcessorMock->expects($this->once())
-            ->method('validateDataIntegrity');
         $this->entityManager->expects($this->once())
-            ->method('save');
-
-        $this->model->save($abstractModelMock);
+            ->method('save')
+            ->with($this->rule);
+        $this->assertEquals($this->model->save($this->rule), $this->model);
     }
 
-    private function setupAbstractModel($resourceMock)
+    public function testDelete()
     {
-        $context = (new \Magento\Framework\TestFramework\Unit\Helper\ObjectManager($this))->getObject(
-            'Magento\Framework\Model\Context'
-        );
-        $registryMock = $this->getMock('\Magento\Framework\Registry', [], [], '', false);
-        $resourceCollectionMock = $this->getMockBuilder('Magento\Framework\Data\Collection\AbstractDb')
-            ->disableOriginalConstructor()
-            ->getMockForAbstractClass();
-
-        $extensionFactoryMock = $this->getMockBuilder(
-            '\Magento\Framework\Api\ExtensionAttributesFactory'
-        )->disableOriginalConstructor()
-            ->getMock();
-        $customAttributeFactoryMock = $this->getMockBuilder('\Magento\Framework\Api\AttributeValueFactory')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $formFactoryMock = $this->getMockBuilder('\Magento\Framework\Data\FormFactory')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $localeDateMock = $this->getMock('\Magento\Framework\Stdlib\DateTime\TimezoneInterface');
-
-        /** @var \Magento\Framework\Model\AbstractModel|\PHPUnit_Framework_MockObject_MockObject $abstractModelMock */
-        $abstractModelMock = $this->getMockForAbstractClass(
-            'Magento\Rule\Model\AbstractModel',
-            [
-                $context,
-                $registryMock,
-                $extensionFactoryMock,
-                $customAttributeFactoryMock,
-                $formFactoryMock,
-                $localeDateMock,
-                $resourceMock,
-                $resourceCollectionMock
-            ]
-        );
-
-        $conditionMock = $this->getMockBuilder('\Magento\Rule\Model\Condition\Combine')
-            ->disableOriginalConstructor()
-            ->setMethods(
-                [
-                    'asArray',
-                    'setRule',
-                    'setId',
-                ]
-            )
-            ->getMock();
-        $conditionMock->expects($this->any())
-            ->method('asArray')
-            ->willReturn([]);
-        $conditionMock->expects($this->any())
-            ->method('setRule')
-            ->willReturnSelf();
-        $conditionMock->expects($this->any())
-            ->method('setId')
-            ->willReturnSelf();
-
-        $actionMock = $this->getMockBuilder('\Magento\Rule\Model\Action\Collection')
-            ->disableOriginalConstructor()
-            ->setMethods(
-                [
-                    'asArray',
-                    'setRule',
-                    'setId',
-                ]
-            )
-            ->getMock();
-        $actionMock->expects($this->any())
-            ->method('setRule')
-            ->willReturnSelf();
-        $actionMock->expects($this->any())
-            ->method('setId')
-            ->willReturnSelf();
-
-        $actionMock->expects($this->any())
-            ->method('asArray')
-            ->willReturn([]);
-        $abstractModelMock->expects($this->any())
-            ->method('getConditions')
-            ->willReturn($conditionMock);
-        $abstractModelMock->expects($this->any())
-            ->method('getConditionsInstance')
-            ->willReturn($conditionMock);
-        $abstractModelMock->expects($this->any())
-            ->method('getActions')
-            ->willReturn($actionMock);
-        $abstractModelMock->expects($this->any())
-            ->method('getActionsInstance')
-            ->willReturn($actionMock);
-
-        return $abstractModelMock;
-    }
-
-    public function testDeleteSuccess()
-    {
-        $this->transactionManagerMock->expects($this->once())->method('start');
-        $abstractModelMock = $this->getMockBuilder('Magento\Rule\Model\AbstractModel')
-            ->disableOriginalConstructor()
-            ->setMethods([])
-            ->getMock();
-        $abstractModelMock->expects($this->once())->method('beforeDelete');
-        $this->entityManager->expects($this->once())->method('delete');
-        $abstractModelMock->expects($this->once())->method('isDeleted');
-        $abstractModelMock->expects($this->once())->method('afterDelete');
-        $this->transactionManagerMock->expects($this->once())->method('commit');
-
-        $this->model->delete($abstractModelMock);
+        $this->entityManager->expects($this->once())
+            ->method('delete')
+            ->with($this->rule);
+        $this->assertEquals($this->model->delete($this->rule), $this->model);
     }
 
     /**
-     * @expectedException \Exception
-     * @expectedExceptionMessage To test exception
+     * Check that can parse JSON string correctly.
+     *
+     * @param string $testString
+     * @param array $expects
+     * @dataProvider dataProviderForProductAttributes
      */
-    public function testDeletionRollbackOnFailure()
+    public function testGetProductAttributes($testString, $expects)
     {
-        $expectedException = new \Exception(__('To test exception'));
-        $this->transactionManagerMock->expects($this->once())->method('start');
-        $abstractModelMock = $this->getMockBuilder('Magento\Rule\Model\AbstractModel')
-            ->disableOriginalConstructor()
-            ->setMethods([])
-            ->getMock();
-        $abstractModelMock->expects($this->once())->method('beforeDelete')->willThrowException($expectedException);
-        $this->transactionManagerMock->expects($this->once())->method('rollBack');
+        $result = $this->model->getProductAttributes($testString);
+        $this->assertEquals($expects, $result);
+    }
 
-        $this->model->delete($abstractModelMock);
+    /**
+     * @return array
+     */
+    public function dataProviderForProductAttributes()
+    {
+        return [
+            [
+                json_encode([
+                    'type' => \Magento\SalesRule\Model\Rule\Condition\Product::class,
+                    'attribute' => 'some_attribute',
+                ]),
+                [
+                    'some_attribute',
+                ]
+            ],
+            [
+                json_encode([
+                    [
+                        'type' => \Magento\SalesRule\Model\Rule\Condition\Product::class,
+                        'attribute' => 'some_attribute',
+                    ],
+                    [
+                        'type' => \Magento\SalesRule\Model\Rule\Condition\Product::class,
+                        'attribute' => 'some_attribute2',
+                    ],
+                ]),
+                [
+                    'some_attribute',
+                    'some_attribute2',
+                ]
+            ],
+            [
+                json_encode([
+                    'type' => \Magento\SalesRule\Model\Rule\Condition\Product\Found::class,
+                    'attribute' => 'some_attribute',
+                ]),
+                []
+            ],
+            [
+                json_encode([]),
+                []
+            ],
+        ];
     }
 }

@@ -1,29 +1,81 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 define([
-    'Magento_Ui/js/form/element/abstract'
-], function (Abstract) {
+    'Magento_Ui/js/form/element/abstract',
+    'underscore',
+    'uiRegistry'
+], function (Abstract, _, registry) {
     'use strict';
 
     return Abstract.extend({
         defaults: {
             allowImport: true,
             autoImportIfEmpty: false,
-            nameValue: '',
-            valueUpdate: 'input'
+            values: {},
+            mask: '',
+            queryTemplate: 'ns = ${ $.ns }, index = '
+        },
+
+        /** @inheritdoc */
+        initialize: function () {
+            this._super();
+
+            if (this.allowImport) {
+                this.setHandlers();
+            }
         },
 
         /**
-         * Import value, if it's allowed
+         * Split mask placeholder and attach events to placeholder fields.
          */
-        handleChanges: function (newValue) {
-            this.nameValue = newValue;
+        setHandlers: function () {
+            var str = this.mask || '',
+                placeholders;
 
-            if (this.allowImport) {
-                this.value(newValue);
+            placeholders = str.match(/{{(.*?)}}/g); // Get placeholders
+
+            _.each(placeholders, function (placeholder) {
+                placeholder = placeholder.replace(/[{{}}]/g, ''); // Remove curly braces
+
+                registry.get(this.queryTemplate + placeholder, function (component) {
+                    this.values[placeholder] = component.getPreview();
+                    component.on('value', this.updateValue.bind(this, placeholder, component));
+                    component.valueUpdate = 'keyup';
+                }.bind(this));
+            }, this);
+        },
+
+        /**
+         * Update field with mask value, if it's allowed.
+         *
+         * @param {Object} placeholder
+         * @param {Object} component
+         */
+        updateValue: function (placeholder, component) {
+            var string = this.mask || '',
+                nonEmptyValueFlag = false;
+
+            if (placeholder) {
+                this.values[placeholder] = component.getPreview() || '';
+            }
+
+            if (!this.allowImport) {
+                return;
+            }
+
+            _.each(this.values, function (propertyValue, propertyName) {
+                string = string.replace('{{' + propertyName + '}}', propertyValue);
+                nonEmptyValueFlag = nonEmptyValueFlag || !!propertyValue;
+            });
+
+            if (nonEmptyValueFlag) {
+                string = string.replace(/(<([^>]+)>)/ig, ''); // Remove html tags
+                this.value(string);
+            } else {
+                this.value('');
             }
         },
 
@@ -47,13 +99,20 @@ define([
          *  and disallow/allow import value
          */
         userChanges: function () {
+
+            /**
+             *  As userChanges is called before updateValue,
+             *  we forced to get value from component by reference
+             */
+            var actualValue = arguments[1].currentTarget.value;
+
             this._super();
 
-            if (this.value() === '') {
+            if (actualValue === '') {
                 this.allowImport = true;
 
                 if (this.autoImportIfEmpty) {
-                    this.value(this.nameValue);
+                    this.updateValue(null, null);
                 }
             } else {
                 this.allowImport = false;

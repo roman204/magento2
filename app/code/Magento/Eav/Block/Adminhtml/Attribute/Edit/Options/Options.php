@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -13,6 +13,10 @@ namespace Magento\Eav\Block\Adminhtml\Attribute\Edit\Options;
 
 use Magento\Store\Model\ResourceModel\Store\Collection;
 
+/**
+ * @api
+ * @since 100.0.2
+ */
 class Options extends \Magento\Backend\Block\Template
 {
     /**
@@ -72,7 +76,7 @@ class Options extends \Magento\Backend\Block\Template
     /**
      * Retrieve stores collection with default store
      *
-     * @return Collection
+     * @return array
      */
     public function getStores()
     {
@@ -80,6 +84,26 @@ class Options extends \Magento\Backend\Block\Template
             $this->setData('stores', $this->_storeManager->getStores(true));
         }
         return $this->_getData('stores');
+    }
+
+    /**
+     * Returns stores sorted by Sort Order
+     *
+     * @return array
+     * @since 100.1.0
+     */
+    public function getStoresSortedBySortOrder()
+    {
+        $stores = $this->getStores();
+        if (is_array($stores)) {
+            usort($stores, function ($storeA, $storeB) {
+                if ($storeA->getSortOrder() == $storeB->getSortOrder()) {
+                    return $storeA->getId() < $storeB->getId() ? -1 : 1;
+                }
+                return ($storeA->getSortOrder() < $storeB->getSortOrder()) ? -1 : 1;
+            });
+        }
+        return $stores;
     }
 
     /**

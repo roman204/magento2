@@ -1,23 +1,23 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Weee\Ui\DataProvider\Product\Form\Modifier;
 
 use Magento\Catalog\Model\Locator\LocatorInterface;
 use Magento\Catalog\Model\Product;
+use Magento\Catalog\Model\ResourceModel\Eav\Attribute as EavAttribute;
+use Magento\Catalog\Model\ResourceModel\Eav\AttributeFactory as EavAttributeFactory;
 use Magento\Catalog\Ui\DataProvider\Product\Form\Modifier\AbstractModifier;
+use Magento\Directory\Helper\Data as DirectoryHelper;
+use Magento\Directory\Model\Config\Source\Country as SourceCountry;
 use Magento\Ui\Component\Container;
 use Magento\Ui\Component\Form\Element\DataType\Price;
 use Magento\Ui\Component\Form\Element\DataType\Text;
 use Magento\Ui\Component\Form\Element\Input;
 use Magento\Ui\Component\Form\Element\Select;
 use Magento\Ui\Component\Form\Field;
-use Magento\Directory\Model\Config\Source\Country as SourceCountry;
-use Magento\Directory\Helper\Data as DirectoryHelper;
-use Magento\Catalog\Model\ResourceModel\Eav\Attribute as EavAttribute;
-use Magento\Catalog\Model\ResourceModel\Eav\AttributeFactory as EavAttributeFactory;
 use Magento\Weee\Ui\DataProvider\Product\Form\Modifier\Manager\Website as WebsiteManager;
 
 /**
@@ -116,8 +116,7 @@ class Weee extends AbstractModifier
             foreach ($metaConfig['children'] as $attributeCode => $attributeConfig) {
                 if ($this->startsWith($attributeCode, self::CONTAINER_PREFIX)) {
                     $metaConfig['children'][$attributeCode] = $this->modifyMetaConfig($attributeConfig);
-                } elseif (
-                    !empty($attributeConfig['arguments']['data']['config']['formElement']) &&
+                } elseif (!empty($attributeConfig['arguments']['data']['config']['formElement']) &&
                     $attributeConfig['arguments']['data']['config']['formElement'] === static::FORM_ELEMENT_WEEE
                 ) {
                     $metaConfig['children'][$attributeCode] =
@@ -178,7 +177,7 @@ class Weee extends AbstractModifier
                                 'data' => [
                                     'config' => [
                                         'componentType' => Container::NAME,
-                                        'component' => 'Magento_Ui/js/form/components/group',
+                                        'component' => 'Magento_Weee/js/fpt-group',
                                         'visible' => true,
                                         'label' => __('Country/State'),
                                     ],
@@ -196,7 +195,7 @@ class Weee extends AbstractModifier
                                                 'visible' => true,
                                                 'options' => $this->getCountries(),
                                                 'validation' => [
-                                                    'required-entry' => true
+                                                    'required-entry' => true,
                                                 ],
                                             ],
                                         ],
@@ -217,8 +216,22 @@ class Weee extends AbstractModifier
                                                 ],
                                                 'caption' => '*',
                                                 'visible' => true,
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                                'val' => [
+                                    'arguments' => [
+                                        'data' => [
+                                            'config' => [
+                                                'componentType' => Field::NAME,
+                                                'formElement' => Input::NAME,
+                                                'dataType' => Text::NAME,
+                                                'enableLabel' => false,
+                                                'visible' => true,
+                                                'additionalClasses' => 'weee_hidden',
                                                 'validation' => [
-                                                    'required-entry' => true
+                                                    'validate-fpt-group' => true
                                                 ],
                                             ],
                                         ],

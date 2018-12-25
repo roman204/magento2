@@ -1,7 +1,7 @@
-/**
- * Copyright © 2015 Magento. All rights reserved.
- * See COPYING.txt for license details.
- */
+// /**
+//  * Copyright © Magento, Inc. All rights reserved.
+//  * See COPYING.txt for license details.
+//  */
 
 @import 'source/lib/_lib.less'; // Global lib
 @import 'source/lib/_utilities.less';
@@ -50,7 +50,7 @@
         &:not(.admin__field-label) {
             :after {
                 content: '*';
-                color: red;
+                color: #f00;
                 margin-left: 3px;
             }
         }
@@ -487,8 +487,8 @@
     }
 
     .notification-entry-dialog .action-close:hover {
-        color: #000;
-        border-bottom-color: #000;
+        color: @color-black;
+        border-bottom-color: @color-black;
         filter: none;
     }
 
@@ -525,7 +525,7 @@
         right: 0;
         top: 100%;
         border: 1px solid #cac2b5;
-        background: #fff;
+        background: @color-white;
         box-shadow: 0 1px 1px rgba(0, 0, 0, .2);
         z-index: 990;
     }
@@ -744,6 +744,7 @@
     //  --------------------------------------
 
     fieldset {
+        min-width: 0;
         padding: 20px;
     }
 
@@ -754,10 +755,6 @@
 
     fieldset legend + br {
         display: none;
-    }
-
-    label {
-        display: inline-block;
     }
 
     label > input[type="radio"],
@@ -789,7 +786,7 @@
         border-radius: 1px;
         padding: 4px;
         color: #303030;
-        background-color: #fff;
+        background-color: @color-white;
         font-weight: 500;
         font-size: 14px;
         height: 33px;
@@ -862,20 +859,18 @@
 
     input[type="radio"],
     input[type="checkbox"] {
-        background: #fff;
-        border: 1px solid #adadad;
+        .lib-css(appearance, none, 1);
+        background: @color-white;
         border-radius: 2px;
+        border: 1px solid #adadad;
         cursor: pointer;
         display: inline-block;
-        vertical-align: middle;
-        margin: 0 5px 0 0;
         height: 16px;
-        width: 16px;
+        margin: 0 5px 0 0;
         position: relative;
-        appearance: none;
-        -webkit-appearance: none;
-        -moz-appearance: none;
         transition: all 0.1s ease-in;
+        vertical-align: middle;
+        width: 16px;
 
         &:focus {
             border-color: #007bdb;
@@ -887,6 +882,11 @@
             background-color: #e9e9e9;
             border-color: #adadad;
             opacity: .5;
+
+            &.admin__control-checkbox,
+            &.admin__control-radio {
+                opacity: 0.01;
+            }
         }
 
         &:checked {
@@ -945,7 +945,7 @@
     }
 
     select[disabled] option[selected] {
-        color: #fff;
+        color: @color-white;
         background: #aaa;
     }
 
@@ -1045,7 +1045,7 @@
         width: auto;
     }
 
-    .control > input.hasDatepicker {
+    .control > input._has-datepicker {
         width: 160px;
     }
 
@@ -1078,7 +1078,7 @@
     }
 
     .control {
-        .hasDatepicker {
+        ._has-datepicker {
             & + .ui-datepicker-trigger {
                 .lib-button-reset();
                 .lib-icon-font(
@@ -1157,7 +1157,7 @@
 
     .fieldset-wrapper,
     .fieldset {
-        background: #fff;
+        background: @color-white;
         border: 0;
         margin: 0;
         padding: 5px 0 38px;
@@ -1243,12 +1243,18 @@
 
     .fieldset-wrapper .draggable-handle,
     .fieldset .draggable-handle {
-        width: 8px;
+        background: url(../Magento_Backend/images/draggable-handle-vertical.png) no-repeat 0 0;
+        color: #b2b0ad;
+        cursor: ns-resize;
         height: 14px;
         line-height: 14px;
-        background: url(../Magento_Backend/images/draggable-handle-vertical.png) no-repeat 0 0;
-        cursor: ns-resize;
-        color: #b2b0ad;
+        margin: 0;
+        vertical-align: top;
+        width: 8px;
+
+        &:before {
+            display: none;
+        }
     }
 
     .fieldset-wrapper-title > .draggable-handle {
@@ -1406,13 +1412,14 @@
 
         span {
             &:after {
-                color: #eb5202;
+                color: #e22626;
                 content: '*';
                 display: inline-block;
                 font-size: 1.6rem;
                 font-weight: 500;
                 line-height: 1;
                 margin-left: 10px;
+                margin-top: 0;
                 position: absolute;
                 top: 1.2rem;
                 z-index: 1;
@@ -1449,8 +1456,15 @@
         }
     }
 
-    .with-addon .textarea {
-        margin: 0 0 6px;
+    .with-addon {
+        .textarea {
+            margin: 0 0 6px;
+        }
+
+        .addon {
+            display: inline-block;
+            width: auto;
+        }
     }
 
     .fieldset .control .textarea,
@@ -1560,7 +1574,7 @@
 
     .multiselect-alt .item {
         position: relative;
-        border-top: 1px solid #fff;
+        border-top: 1px solid @color-white;
         cursor: pointer;
     }
 
@@ -1637,7 +1651,7 @@
 
             ~ .addafter strong {
                 display: inline-block;
-                background: #fff;
+                background: @color-white;
                 line-height: 24px;
                 margin: 0 3px 0 0;
                 padding-left: 4px;
@@ -1686,10 +1700,6 @@
         }
     }
 
-    .field-price .addon input[type="text"] ~ .addafter strong {
-        font-size: 18px;
-    }
-
     .field-weight,
     .field-base_price {
         .addon {
@@ -1702,6 +1712,7 @@
     .field.type-price .addon,
     .field-price .addon,
     .field-special_price .addon,
+    .field-gift_wrapping_price .addon,
     .field-msrp .addon {
         direction: rtl;
     }
@@ -1709,6 +1720,7 @@
     .field.type-price .addon > *,
     .field-price .addon > *,
     .field-special_price .addon > *,
+    .field-gift_wrapping_price .addon > *,
     .field-msrp .addon > * {
         direction: ltr;
     }
@@ -1716,6 +1728,7 @@
     .field.type-price .addon .addafter,
     .field-price .addon .addafter,
     .field-special_price .addon .addafter,
+    .field-gift_wrapping_price .addon .addafter,
     .field-msrp .addon .addafter {
         border-width: 1px 0 1px 1px;
         border-radius: 1px 0 0 1px;
@@ -1724,6 +1737,7 @@
     .field.type-price .addon input[type=text]:first-child,
     .field-price .addon input[type=text]:first-child,
     .field-special_price .addon input[type=text]:first-child,
+    .field-gift_wrapping_price .addon input[type=text]:first-child,
     .field-msrp .addon input[type=text]:first-child {
         border-radius: 0 1px 1px 0;
     }
@@ -1731,6 +1745,7 @@
     .field.type-price input:focus,
     .field-price input:focus,
     .field-special_price input:focus,
+    .field-gift_wrapping_price input:focus,
     .field-msrp input:focus {
         border-color: #007bdb;
     }
@@ -1738,6 +1753,7 @@
     .field.type-price input:focus ~ label.addafter,
     .field-price input:focus ~ label.addafter,
     .field-special_price input:focus ~ label.addafter,
+    .field-gift_wrapping_price input:focus ~ label.addafter,
     .field-msrp input:focus ~ label.addafter {
         border-color: #007bdb;
     }
@@ -2025,7 +2041,7 @@
         &:before {
             position: absolute;
             content: "";
-            background-color: #fff;
+            background-color: @color-white;
             right: 0;
             top: 0;
             bottom: 0;
@@ -2158,7 +2174,7 @@
             font-weight: bold;
         }
         .webiste-groups {
-            margin: 5px 0 20px 18px;
+            margin: 5px 0 20px 25px;
 
             dt {
                 font-weight: bold;
@@ -2182,7 +2198,8 @@
 
     //
     //  Tree Store Scope
-    //  --------------------------------------
+    //  ---------------------------------------------
+
     .tree-store-scope {
         .buttons-set {
             margin-bottom: 9px;
@@ -2195,10 +2212,12 @@
         .field {
             margin: 0 0 5px;
 
-            input[type="checkbox"]:not(.banner-content-checkbox) {
-                margin-right: 8px;
-                position: relative;
-                top: 2px;
+            input[type="checkbox"] {
+                &:not(.banner-content-checkbox) {
+                    margin-right: 8px;
+                    position: relative;
+                    top: 2px;
+                }
             }
 
             .addafter {
@@ -2207,23 +2226,10 @@
             }
         }
 
-        [class^="field field-website_"] .label,
-        [class^="field field-group_"] .label,
-        [class^="field field-w_"] .label,
-        [class^="field field-sg_"] .label {
-            text-align: left;
-            font-size: 18px;
-            padding-right: 0;
-            width: auto;
-        }
-
-        [class^="field field-group_"] .label,
-        [class^="field field-sg_"] .label {
-            padding-left: 20px;
-        }
-
-        .tooltip .help {
-            margin-top: 11px;
+        .tooltip {
+            .help {
+                margin-top: 11px;
+            }
         }
     }
 
@@ -2292,7 +2298,7 @@
     //  --------------------------------------
 
     .preview-window {
-        background: #fff;
+        background: @color-white;
     }
 
     .preview-window .toolbar {
@@ -2452,7 +2458,7 @@
     }
 
     .attribute-popup .page-actions.fixed .page-actions-inner {
-        background: #fff;
+        background: @color-white;
         padding: 0;
         min-width: 100%;
         max-width: 100%;
@@ -2580,7 +2586,7 @@
 
     //
     //  Customer
-    //  ---------------------------------------
+    //  ---------------------------------------------
 
     #customer_info_tabs_account_content #_accountsendemail {
         margin-top: 8px;
@@ -2607,37 +2613,55 @@
     }
 
     .customer-information address {
-        padding-top: 4px;
-        line-height: 2.2;
         float: right;
+        line-height: 2.2;
+        padding-top: 4px;
     }
 
     .address-list {
+        float: left;
         list-style: none;
-        width: 278px;
         margin: 0 0 10px;
         padding: 0;
-        float: left;
+        width: 278px;
     }
 
     //
-    //      Configuration -> Design
-    //  --------------------------------------
+    //  Configuration -> Design
+    //  ---------------------------------------------
 
-    #row_design_theme_ua_regexp .design_theme_ua_regexp {
-        float: left;
-        width: 100%;
+    #row_design_theme_ua_regexp {
+        .design_theme_ua_regexp {
+            float: left;
+            width: 100%;
+        }
+
+        .tooltip {
+            margin-top: 8px;
+        }
+
+        .note {
+            clear: both;
+        }
     }
-    #row_design_theme_ua_regexp .tooltip {
-        margin-top: 8px;
-    }
-    #row_design_theme_ua_regexp .note {
-        clear: both;
+
+    .form-list {
+        .small-image-preview {
+            display: inline-block;
+            margin: 0 @indent__xs 0 0;
+            vertical-align: middle;
+        }
+
+        .delete-image {
+            display: block;
+            margin: @indent__xs 0;
+            white-space: nowrap;
+        }
     }
 
     //
-    //      Configuration -> Advanced -> System -> Notifications section
-    //  --------------------------------------
+    //  Configuration -> Advanced -> System -> Notifications section
+    //  ---------------------------------------------
 
     #row_system_adminnotification_last_update {
         .value {
@@ -2647,7 +2671,7 @@
 
     //
     //  CMS -> Banners
-    //  --------------------------------------
+    //  ---------------------------------------------
 
     // Banner Properties
     #banner_properties_customer_segment_ids {
@@ -2656,7 +2680,7 @@
 
     //
     //  CMS -> Manage Hierarchy
-    //  --------------------------------------
+    //  ---------------------------------------------
 
     .cms-hierarchy .cms-scope {
         float: right;
@@ -2708,7 +2732,7 @@
 
     //
     //  CMS -> Widgets
-    //  --------------------------------------
+    //  ---------------------------------------------
 
     #widget_instace_tabs_properties_section_content .widget-option-label {
         margin-top: 6px;
@@ -2733,7 +2757,7 @@
             border: 1px solid #c9c2b8;
             border-width: 0 0 1px;
             padding: 6px 10px 7px;
-            background: #fff;
+            background: @color-white;
             .style2();
 
             span {
@@ -2745,7 +2769,7 @@
         td {
             border: none;
             padding: 6px 10px 7px;
-            background: #fff;
+            background: @color-white;
         }
 
         tr:last-child td {
@@ -2798,7 +2822,7 @@
         width: 160px;
     }
 
-    .reports-content input.hasDatepicker {
+    .reports-content input._has-datepicker {
         width: 133px;
     }
 
@@ -2806,7 +2830,7 @@
         position: relative;
     }
 
-    .reports-content input.hasDatepicker + label.mage-error {
+    .reports-content input._has-datepicker + label.mage-error {
         left: 0;
         position: absolute;
         top: 30px;
@@ -2834,7 +2858,7 @@
 
     .table-fieldset-alt tbody tr:nth-child(odd) td,
     .table-fieldset-alt tbody tr:nth-child(odd):hover td {
-        background: #fff;
+        background: @color-white;
     }
 
     //
@@ -2894,7 +2918,7 @@
     }
 
     .order-details-existing-customer {
-        background: #fff;
+        background: @color-white;
         padding-left: 0;
         position: relative;
         width: 77.9%;
@@ -3011,7 +3035,7 @@
     }
 
     .gift-options-tooltip {
-        background: #fff;
+        background: @color-white;
         border-radius: 5px;
         padding: 10px;
         box-shadow: 0 0 3px rgba(0, 0, 0, .3);
@@ -3170,7 +3194,7 @@
             left: 0;
             margin: 0 8px;
             padding: 10px;
-            background: #fff;
+            background: @color-white;
         }
     }
 
@@ -3362,7 +3386,7 @@
 
     .rma-popup,
     .cms-popup {
-        background: #fff;
+        background: @color-white;
         box-shadow: 0 3px 6px rgba(0, 0, 0, .4);
         cursor: default;
         position: fixed;
@@ -3386,7 +3410,7 @@
     }
 
     .rma-popup .content {
-        background: #fff;
+        background: @color-white;
         border-bottom: 1px solid #ccc;
         max-height: 400px;
         overflow: auto;
@@ -3443,7 +3467,7 @@
     .grid .rma-popup .form-list tr,
     .grid tr.even .rma-popup .form-list tr,
     .grid tr.on-mouse .rma-popup .form-list tr {
-        background: #fff !important;
+        background: @color-white !important;
     }
 
     //
@@ -3703,6 +3727,7 @@
         width: 31.9149%;
     }
 
+    .edit-attribute-set,
     .attribute-set-col:first-child {
         margin-left: 0;
     }
@@ -3764,8 +3789,16 @@
         border-left: none !important;
     }
 
+    .rule-tree {
+        ._has-datepicker {
+            + .ui-datepicker-trigger {
+                position: static;
+            }
+        }
+    }
+
     .rule-param .label {
-        color: #000;
+        color: @color-black;
         float: none;
         text-align: left;
         padding: 0;
@@ -3838,10 +3871,6 @@
         padding-top: 13px;
     }
 
-    // jstree
-    .jstree-default .disabled > a {
-        color: #a29c94;
-    }
     //
     //  debug.less (end)
     //  --------------------------------------
@@ -3856,7 +3885,7 @@
     .defaultSkin {
         table.mceLayout {
             td {
-                background: #fff;
+                background: @color-white;
             }
         }
 
@@ -4687,6 +4716,20 @@
     }
 }
 
+.content-category-tree {
+    clear: both;
+
+    .jstree-default {
+        margin-bottom: 3rem;
+
+        .disabled {
+            > a {
+                color: #a29c94;
+            }
+        }
+    }
+}
+
 //  Marketing -> Reviews
 .review-product-index {
     .admin__scope-old {
@@ -4982,6 +5025,36 @@
     }
 }
 
+//  Stores -> Product Attribute Edit
+.catalog-product-attribute-edit {
+    .admin__scope-old {
+        .data-table {
+            th {
+                &._required {
+                    span {
+                        &:after {
+                            content: '*';
+                            .lib-typography(
+                            @_font-size: @form-field-label-asterisk__font-size,
+                            @_color: @form-field-label-asterisk__color,
+                            @_font-family: @form-field-label-asterisk__font-family,
+                            @_font-weight: @form-field-label-asterisk__font-weight,
+                            @_line-height: @form-field-label-asterisk__line-height,
+                            @_font-style: @form-field-label-asterisk__font-style
+                            );
+                            .lib-css(margin, @form-field-label-asterisk__margin);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    .admin__control-table-wrapper {
+        clear: both;
+    }
+}
+
 .catalog-product-set-index {
     .admin__scope-old {
         .col-set_name {
@@ -5018,7 +5091,7 @@
                 width: 37%;
             }
 
-            .hasDatepicker {
+            ._has-datepicker {
                 margin: 0 5px;
                 width: 32%;
             }
@@ -5156,7 +5229,7 @@
 @media print {
     * {
         background: transparent !important;
-        color: black !important;
+        color: @color-black !important;
         box-shadow: none !important;
         text-shadow: none !important;
         filter: none !important;

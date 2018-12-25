@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Ui\DataProvider\Product\Form;
@@ -12,13 +12,16 @@ use Magento\Ui\DataProvider\Modifier\PoolInterface;
 
 /**
  * DataProvider for product edit form
+ *
+ * @api
+ * @since 101.0.0
  */
 class ProductDataProvider extends AbstractDataProvider
 {
     /**
      * @var PoolInterface
      */
-    protected $pool;
+    private $pool;
 
     /**
      * @param string $name
@@ -45,6 +48,7 @@ class ProductDataProvider extends AbstractDataProvider
 
     /**
      * {@inheritdoc}
+     * @since 101.0.0
      */
     public function getData()
     {
@@ -58,6 +62,7 @@ class ProductDataProvider extends AbstractDataProvider
 
     /**
      * {@inheritdoc}
+     * @since 101.0.0
      */
     public function getMeta()
     {

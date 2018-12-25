@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Controller\Address;
@@ -9,12 +9,14 @@ use Magento\Customer\Api\AddressRepositoryInterface;
 use Magento\Customer\Api\Data\AddressInterfaceFactory;
 use Magento\Customer\Api\Data\RegionInterface;
 use Magento\Customer\Api\Data\RegionInterfaceFactory;
+use Magento\Customer\Model\Address\Mapper;
 use Magento\Customer\Model\Metadata\FormFactory;
 use Magento\Customer\Model\Session;
 use Magento\Directory\Helper\Data as HelperData;
 use Magento\Directory\Model\RegionFactory;
 use Magento\Framework\Api\DataObjectHelper;
 use Magento\Framework\App\Action\Context;
+use Magento\Framework\App\ObjectManager;
 use Magento\Framework\Controller\Result\ForwardFactory;
 use Magento\Framework\Data\Form\FormKey\Validator as FormKeyValidator;
 use Magento\Framework\Exception\InputException;
@@ -35,6 +37,11 @@ class FormPost extends \Magento\Customer\Controller\Address
      * @var HelperData
      */
     protected $helperData;
+
+    /**
+     * @var Mapper
+     */
+    private $customerAddressMapper;
 
     /**
      * @param Context $context
@@ -94,7 +101,11 @@ class FormPost extends \Magento\Customer\Controller\Address
         $existingAddressData = $this->getExistingAddressData();
 
         /** @var \Magento\Customer\Model\Metadata\Form $addressForm */
-        $addressForm = $this->_formFactory->create('customer_address', 'customer_address_edit', $existingAddressData);
+        $addressForm = $this->_formFactory->create(
+            'customer_address',
+            'customer_address_edit',
+            $existingAddressData
+        );
         $addressData = $addressForm->extractData($this->getRequest());
         $attributeValues = $addressForm->compactData($addressData);
 
@@ -104,7 +115,7 @@ class FormPost extends \Magento\Customer\Controller\Address
         $this->dataObjectHelper->populateWithArray(
             $addressDataObject,
             array_merge($existingAddressData, $attributeValues),
-            '\Magento\Customer\Api\Data\AddressInterface'
+            \Magento\Customer\Api\Data\AddressInterface::class
         );
         $addressDataObject->setCustomerId($this->_getSession()->getCustomerId())
             ->setIsDefaultBilling($this->getRequest()->getParam('default_billing', false))
@@ -127,12 +138,7 @@ class FormPost extends \Magento\Customer\Controller\Address
             if ($existingAddress->getCustomerId() !== $this->_getSession()->getCustomerId()) {
                 throw new \Exception();
             }
-            $existingAddressData = $this->_dataProcessor->buildOutputDataArray(
-                $existingAddress,
-                '\Magento\Customer\Api\Data\AddressInterface'
-            );
-            $existingAddressData['region_code'] = $existingAddress->getRegion()->getRegionCode();
-            $existingAddressData['region'] = $existingAddress->getRegion()->getRegion();
+            $existingAddressData = $this->getCustomerAddressMapper()->toFlatArray($existingAddress);
         }
         return $existingAddressData;
     }
@@ -164,7 +170,7 @@ class FormPost extends \Magento\Customer\Controller\Address
         $this->dataObjectHelper->populateWithArray(
             $region,
             $regionData,
-            '\Magento\Customer\Api\Data\RegionInterface'
+            \Magento\Customer\Api\Data\RegionInterface::class
         );
         $attributeValues['region'] = $region;
     }
@@ -191,17 +197,17 @@ class FormPost extends \Magento\Customer\Controller\Address
         try {
             $address = $this->_extractAddress();
             $this->_addressRepository->save($address);
-            $this->messageManager->addSuccess(__('You saved the address.'));
+            $this->messageManager->addSuccessMessage(__('You saved the address.'));
             $url = $this->_buildUrl('*/*/index', ['_secure' => true]);
             return $this->resultRedirectFactory->create()->setUrl($this->_redirect->success($url));
         } catch (InputException $e) {
-            $this->messageManager->addError($e->getMessage());
+            $this->messageManager->addErrorMessage($e->getMessage());
             foreach ($e->getErrors() as $error) {
-                $this->messageManager->addError($error->getMessage());
+                $this->messageManager->addErrorMessage($error->getMessage());
             }
         } catch (\Exception $e) {
             $redirectUrl = $this->_buildUrl('*/*/index');
-            $this->messageManager->addException($e, __('We can\'t save the address.'));
+            $this->messageManager->addExceptionMessage($e, __('We can\'t save the address.'));
         }
 
         $url = $redirectUrl;
@@ -211,5 +217,22 @@ class FormPost extends \Magento\Customer\Controller\Address
         }
 
         return $this->resultRedirectFactory->create()->setUrl($this->_redirect->error($url));
+    }
+
+    /**
+     * Get Customer Address Mapper instance
+     *
+     * @return Mapper
+     *
+     * @deprecated 100.1.3
+     */
+    private function getCustomerAddressMapper()
+    {
+        if ($this->customerAddressMapper === null) {
+            $this->customerAddressMapper = ObjectManager::getInstance()->get(
+                \Magento\Customer\Model\Address\Mapper::class
+            );
+        }
+        return $this->customerAddressMapper;
     }
 }

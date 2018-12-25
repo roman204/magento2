@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Theme\Model;
@@ -15,14 +15,27 @@ use Magento\Theme\Model\Design\Config\Storage as ConfigStorage;
 
 class DesignConfigRepository implements DesignConfigRepositoryInterface
 {
-    /** @var ReinitableConfigInterface */
+    /**
+     * @var \Magento\Framework\App\Config\ReinitableConfigInterface
+     */
     protected $reinitableConfig;
 
-    /** @var IndexerRegistry */
+    /**
+     * @var \Magento\Framework\Indexer\IndexerRegistry
+     */
     protected $indexerRegistry;
 
-    /** @var ConfigStorage */
+    /**
+     * @var \Magento\Theme\Model\Design\Config\Storage
+     */
     protected $configStorage;
+
+    /**
+     * Design config validator
+     *
+     * @var \Magento\Theme\Model\Design\Config\Validator
+     */
+    private $validator;
 
     /**
      * @param ConfigStorage $configStorage
@@ -37,6 +50,23 @@ class DesignConfigRepository implements DesignConfigRepositoryInterface
         $this->reinitableConfig = $reinitableConfig;
         $this->indexerRegistry = $indexerRegistry;
         $this->configStorage = $configStorage;
+    }
+
+    /**
+     * Get config validator
+     *
+     * @return Design\Config\Validator
+     *
+     * @deprecated 100.1.0
+     */
+    private function getValidator()
+    {
+        if (null === $this->validator) {
+            $this->validator =\Magento\Framework\App\ObjectManager::getInstance()->get(
+                \Magento\Theme\Model\Design\Config\Validator::class
+            );
+        }
+        return $this->validator;
     }
 
     /**
@@ -57,6 +87,8 @@ class DesignConfigRepository implements DesignConfigRepositoryInterface
         ) {
             throw new LocalizedException(__('Can not save empty config'));
         }
+
+        $this->getValidator()->validate($designConfig);
 
         $this->configStorage->save($designConfig);
         $this->reinitableConfig->reinit();

@@ -1,19 +1,21 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\SalesRule\Model\ResourceModel;
 
-use \Magento\SalesRule\Model\Rule as SalesRule;
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\EntityManager\EntityManager;
+use Magento\Framework\EntityManager\MetadataPool;
 use Magento\Framework\Model\AbstractModel;
-use Magento\Framework\DB\Select;
+use Magento\Framework\Serialize\Serializer\Json;
 use Magento\Rule\Model\ResourceModel\AbstractResource;
-use Magento\Framework\Model\EntityManager;
 use Magento\SalesRule\Api\Data\RuleInterface;
 
 /**
  * Sales Rule resource model
+ * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
  */
 class Rule extends AbstractResource
 {
@@ -52,25 +54,36 @@ class Rule extends AbstractResource
     protected $entityManager;
 
     /**
+     * @var MetadataPool
+     */
+    private $metadataPool;
+
+    /**
      * @param \Magento\Framework\Model\ResourceModel\Db\Context $context
      * @param \Magento\Framework\Stdlib\StringUtils $string
      * @param \Magento\SalesRule\Model\ResourceModel\Coupon $resourceCoupon
-     * @param EntityManager $entityManager
-     * @param array $associatedEntitiesMap
      * @param string $connectionName
+     * @param \Magento\Framework\DataObject|null $associatedEntityMapInstance
+     * @param Json $serializer Optional parameter for backward compatibility
+     * @param MetadataPool $metadataPool Optional parameter for backward compatibility
      */
     public function __construct(
         \Magento\Framework\Model\ResourceModel\Db\Context $context,
         \Magento\Framework\Stdlib\StringUtils $string,
         \Magento\SalesRule\Model\ResourceModel\Coupon $resourceCoupon,
-        EntityManager $entityManager,
-        array $associatedEntitiesMap = [],
-        $connectionName = null
+        $connectionName = null,
+        \Magento\Framework\DataObject $associatedEntityMapInstance = null,
+        Json $serializer = null,
+        MetadataPool $metadataPool = null
     ) {
         $this->string = $string;
         $this->_resourceCoupon = $resourceCoupon;
-        $this->entityManager = $entityManager;
-        $this->_associatedEntitiesMap = $associatedEntitiesMap;
+        $associatedEntitiesMapInstance = $associatedEntityMapInstance ?: ObjectManager::getInstance()->get(
+            \Magento\SalesRule\Model\ResourceModel\Rule\AssociatedEntityMap::class
+        );
+        $this->_associatedEntitiesMap = $associatedEntitiesMapInstance->getData();
+        $this->serializer = $serializer ?: ObjectManager::getInstance()->get(Json::class);
+        $this->metadataPool = $metadataPool ?: ObjectManager::getInstance()->get(MetadataPool::class);
         parent::__construct($context, $connectionName);
     }
 
@@ -87,7 +100,7 @@ class Rule extends AbstractResource
     /**
      * @param AbstractModel $object
      * @return void
-     * @deprecated
+     * @deprecated 100.1.0
      */
     public function loadCustomerGroupIds(AbstractModel $object)
     {
@@ -100,7 +113,7 @@ class Rule extends AbstractResource
     /**
      * @param AbstractModel $object
      * @return void
-     * @deprecated
+     * @deprecated 100.1.0
      */
     public function loadWebsiteIds(AbstractModel $object)
     {
@@ -130,7 +143,7 @@ class Rule extends AbstractResource
     /**
      * Load an object
      *
-     * @param SalesRule|AbstractModel $object
+     * @param AbstractModel $object
      * @param mixed $value
      * @param string $field field to load by (defaults to model id)
      * @return $this
@@ -138,9 +151,7 @@ class Rule extends AbstractResource
      */
     public function load(AbstractModel $object, $value, $field = null)
     {
-        $this->entityManager->load(RuleInterface::class, $object, $value);
-        $this->unserializeFields($object);
-        $this->_afterLoad($object);
+        $this->getEntityManager()->load($object, $value);
         return $this;
     }
 
@@ -160,8 +171,8 @@ class Rule extends AbstractResource
 
         // Save product attributes used in rule
         $ruleProductAttributes = array_merge(
-            $this->getProductAttributes(serialize($object->getConditions()->asArray())),
-            $this->getProductAttributes(serialize($object->getActions()->asArray()))
+            $this->getProductAttributes($this->serializer->serialize($object->getConditions()->asArray())),
+            $this->getProductAttributes($this->serializer->serialize($object->getActions()->asArray()))
         );
         if (count($ruleProductAttributes)) {
             $this->setActualProductAttributes($object, $ruleProductAttributes);
@@ -185,7 +196,7 @@ class Rule extends AbstractResource
     {
         $connection = $this->getConnection();
         $select = $connection->select()->from(
-            $this->getTable('rule_customer'),
+            $this->getTable('salesrule_customer'),
             ['cnt' => 'count(*)']
         )->where(
             'rule_id = :rule_id'
@@ -228,7 +239,7 @@ class Rule extends AbstractResource
                 $connection->delete($table, ['rule_id=?' => $ruleId, 'store_id IN (?)' => $deleteByStoreIds]);
             }
         } catch (\Exception $e) {
-            $connection->rollback();
+            $connection->rollBack();
             throw $e;
         }
         $connection->commit();
@@ -304,7 +315,11 @@ class Rule extends AbstractResource
     public function setActualProductAttributes($rule, $attributes)
     {
         $connection = $this->getConnection();
-        $connection->delete($this->getTable('salesrule_product_attribute'), ['rule_id=?' => $rule->getId()]);
+        $metadata = $this->metadataPool->getMetadata(RuleInterface::class);
+        $connection->delete(
+            $this->getTable('salesrule_product_attribute'),
+            [$metadata->getLinkField() . '=?' => $rule->getData($metadata->getLinkField())]
+        );
 
         //Getting attribute IDs for attribute codes
         $attributeIds = [];
@@ -326,7 +341,7 @@ class Rule extends AbstractResource
                 foreach ($rule->getWebsiteIds() as $websiteId) {
                     foreach ($attributeIds as $attribute) {
                         $data[] = [
-                            'rule_id' => $rule->getId(),
+                            $metadata->getLinkField() => $rule->getData($metadata->getLinkField()),
                             'website_id' => $websiteId,
                             'customer_group_id' => $customerGroupId,
                             'attribute_id' => $attribute,
@@ -348,59 +363,23 @@ class Rule extends AbstractResource
      */
     public function getProductAttributes($serializedString)
     {
-        $result = [];
-        if (preg_match_all(
-            '~s:32:"salesrule/rule_condition_product";s:9:"attribute";s:\d+:"(.*?)"~s',
+        // we need 4 backslashes to match 1 in regexp, see http://www.php.net/manual/en/regexp.reference.escape.php
+        preg_match_all(
+            '~"Magento\\\\\\\\SalesRule\\\\\\\\Model\\\\\\\\Rule\\\\\\\\Condition\\\\\\\\Product","attribute":"(.*?)"~',
             $serializedString,
             $matches
-        )
-        ) {
-            foreach ($matches[1] as $attributeCode) {
-                $result[] = $attributeCode;
-            }
-        }
-
-        return $result;
+        );
+        // we always have $matches like [[],[]]
+        return array_values($matches[1]);
     }
 
     /**
      * @param \Magento\Framework\Model\AbstractModel $object
      * @return $this
-     * @throws \Exception
      */
     public function save(\Magento\Framework\Model\AbstractModel $object)
     {
-        if ($object->isDeleted()) {
-            return $this->delete($object);
-        }
-
-        $this->beginTransaction();
-
-        try {
-            if (!$this->isModified($object)) {
-                $this->processNotModifiedSave($object);
-                $this->commit();
-                $object->setHasDataChanges(false);
-                return $this;
-            }
-            $object->validateBeforeSave();
-            $object->beforeSave();
-            if ($object->isSaveAllowed()) {
-                $this->_serializeFields($object);
-                $this->_beforeSave($object);
-                $this->_checkUnique($object);
-                $this->objectRelationProcessor->validateDataIntegrity($this->getMainTable(), $object->getData());
-                $this->entityManager->save(RuleInterface::class, $object);
-                $this->unserializeFields($object);
-                $this->processAfterSaves($object);
-            }
-            $this->addCommitCallback([$object, 'afterCommitCallback'])->commit();
-            $object->setHasDataChanges(false);
-        } catch (\Exception $e) {
-            $this->rollBack();
-            $object->setHasDataChanges(true);
-            throw $e;
-        }
+        $this->getEntityManager()->save($object);
         return $this;
     }
 
@@ -409,24 +388,23 @@ class Rule extends AbstractResource
      *
      * @param \Magento\Framework\Model\AbstractModel $object
      * @return $this
-     * @throws \Exception
      */
     public function delete(AbstractModel $object)
     {
-        $this->transactionManager->start($this->getConnection());
-        try {
-            $object->beforeDelete();
-            $this->_beforeDelete($object);
-            $this->entityManager->delete('Magento\SalesRule\Api\Data\RuleInterface', $object);
-            $this->_afterDelete($object);
-            $object->isDeleted(true);
-            $object->afterDelete();
-            $this->transactionManager->commit();
-            $object->afterDeleteCommit();
-        } catch (\Exception $exception) {
-            $this->transactionManager->rollBack();
-            throw $exception;
-        }
+        $this->getEntityManager()->delete($object);
         return $this;
+    }
+
+    /**
+     * @return \Magento\Framework\EntityManager\EntityManager
+     * @deprecated 100.1.0
+     */
+    private function getEntityManager()
+    {
+        if (null === $this->entityManager) {
+            $this->entityManager = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\EntityManager\EntityManager::class);
+        }
+        return $this->entityManager;
     }
 }

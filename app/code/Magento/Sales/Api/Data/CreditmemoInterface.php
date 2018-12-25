@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -15,6 +15,7 @@ namespace Magento\Sales\Api\Data;
  * to refund all or part of the amount paid for any returned or undelivered items. The memo restores funds to the
  * customer account so that the customer can make future purchases.
  * @api
+ * @since 100.0.2
  */
 interface CreditmemoInterface extends \Magento\Framework\Api\ExtensibleDataInterface
 {
@@ -304,7 +305,7 @@ interface CreditmemoInterface extends \Magento\Framework\Api\ExtensibleDataInter
     /**
      * Gets the credit memo base discount tax compensation amount.
      *
-     * @return float Credit memo base discount tax compensation amount.
+     * @return float|null Credit memo base discount tax compensation amount.
      */
     public function getBaseDiscountTaxCompensationAmount();
 
@@ -318,7 +319,7 @@ interface CreditmemoInterface extends \Magento\Framework\Api\ExtensibleDataInter
     /**
      * Gets the credit memo base shipping discount tax compensation amount.
      *
-     * @return float Credit memo base shipping discount tax compensation amount.
+     * @return float|null Credit memo base shipping discount tax compensation amount.
      */
     public function getBaseShippingDiscountTaxCompensationAmnt();
 
@@ -453,7 +454,7 @@ interface CreditmemoInterface extends \Magento\Framework\Api\ExtensibleDataInter
     /**
      * Gets the credit memo discount tax compensation amount.
      *
-     * @return float Credit memo discount tax compensation amount.
+     * @return float|null Credit memo discount tax compensation amount.
      */
     public function getDiscountTaxCompensationAmount();
 
@@ -491,6 +492,7 @@ interface CreditmemoInterface extends \Magento\Framework\Api\ExtensibleDataInter
      * @return int|null Credit memo shipping address ID.
      */
     public function getShippingAddressId();
+
     /**
      * Gets the credit memo shipping amount.
      *
@@ -501,7 +503,7 @@ interface CreditmemoInterface extends \Magento\Framework\Api\ExtensibleDataInter
     /**
      * Gets the credit memo shipping discount tax compensation amount.
      *
-     * @return float Credit memo shipping discount tax compensation amount.
+     * @return float|null Credit memo shipping discount tax compensation amount.
      */
     public function getShippingDiscountTaxCompensationAmount();
 

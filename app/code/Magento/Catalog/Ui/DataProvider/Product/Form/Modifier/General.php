@@ -1,91 +1,103 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Catalog\Ui\DataProvider\Product\Form\Modifier;
 
-use Magento\Catalog\Model\AttributeConstantsInterface;
+use Magento\Catalog\Api\Data\ProductAttributeInterface;
 use Magento\Catalog\Model\Locator\LocatorInterface;
+use Magento\Eav\Api\AttributeRepositoryInterface;
 use Magento\Ui\Component\Form;
-use Magento\Catalog\Ui\DataProvider\Grouper;
 use Magento\Framework\Stdlib\ArrayManager;
 
 /**
  * Data provider for main panel of product page
+ *
+ * @api
+ * @since 101.0.0
  */
 class General extends AbstractModifier
 {
     /**
      * @var LocatorInterface
+     * @since 101.0.0
      */
     protected $locator;
 
     /**
-     * @var Grouper
-     */
-    protected $grouper;
-
-    /**
      * @var ArrayManager
+     * @since 101.0.0
      */
     protected $arrayManager;
 
     /**
+     * @var \Magento\Framework\Locale\CurrencyInterface
+     */
+    private $localeCurrency;
+
+    /**
+     * @var AttributeRepositoryInterface
+     */
+    private $attributeRepository;
+
+    /**
      * @param LocatorInterface $locator
-     * @param Grouper $grouper
      * @param ArrayManager $arrayManager
+     * @param AttributeRepositoryInterface|null $attributeRepository
      */
     public function __construct(
         LocatorInterface $locator,
-        Grouper $grouper,
-        ArrayManager $arrayManager
+        ArrayManager $arrayManager,
+        AttributeRepositoryInterface $attributeRepository = null
     ) {
         $this->locator = $locator;
-        $this->grouper = $grouper;
         $this->arrayManager = $arrayManager;
+        $this->attributeRepository = $attributeRepository
+            ?: \Magento\Framework\App\ObjectManager::getInstance()->get(AttributeRepositoryInterface::class);
     }
 
     /**
      * {@inheritdoc}
+     * @since 101.0.0
      */
     public function modifyData(array $data)
     {
-        $data = $this->customizeNumberFormat($data);
+        $data = $this->customizeWeightFormat($data);
         $data = $this->customizeAdvancedPriceFormat($data);
         $modelId = $this->locator->getProduct()->getId();
 
-        if (!isset($data[$modelId][static::DATA_SOURCE_DEFAULT][AttributeConstantsInterface::CODE_STATUS])) {
-            $data[$modelId][static::DATA_SOURCE_DEFAULT][AttributeConstantsInterface::CODE_STATUS] = '1';
+        if (!isset($data[$modelId][static::DATA_SOURCE_DEFAULT][ProductAttributeInterface::CODE_STATUS])) {
+            $attributeStatus = $this->attributeRepository->get(
+                ProductAttributeInterface::ENTITY_TYPE_CODE,
+                ProductAttributeInterface::CODE_STATUS
+            );
+            $data[$modelId][static::DATA_SOURCE_DEFAULT][ProductAttributeInterface::CODE_STATUS] =
+                $attributeStatus->getDefaultValue() ?: 1;
         }
 
         return $data;
     }
 
     /**
-     * Customizing number fields
+     * Customizing weight fields
      *
      * @param array $data
      * @return array
+     * @since 101.0.0
      */
-    protected function customizeNumberFormat(array $data)
+    protected function customizeWeightFormat(array $data)
     {
         $model = $this->locator->getProduct();
         $modelId = $model->getId();
-        $numberFields = [
-            AttributeConstantsInterface::CODE_PRICE,
-            AttributeConstantsInterface::CODE_WEIGHT,
-            AttributeConstantsInterface::CODE_SPECIAL_PRICE,
-            AttributeConstantsInterface::CODE_COST,
-        ];
+        $weightFields = [ProductAttributeInterface::CODE_WEIGHT];
 
-        foreach ($numberFields as $fieldCode) {
+        foreach ($weightFields as $fieldCode) {
             $path = $modelId . '/' . self::DATA_SOURCE_DEFAULT . '/' . $fieldCode;
-            $number = (float)$this->arrayManager->get($path, $data);
             $data = $this->arrayManager->replace(
                 $path,
                 $data,
-                $this->formatNumber($number)
+                $this->formatWeight($this->arrayManager->get($path, $data))
             );
         }
 
@@ -93,34 +105,23 @@ class General extends AbstractModifier
     }
 
     /**
-     * Formatting numeric field
-     *
-     * @param float $number
-     * @param int $decimals
-     * @return string
-     */
-    protected function formatNumber($number, $decimals = 2)
-    {
-        return number_format($number, $decimals);
-    }
-
-    /**
      * Customizing number fields for advanced price
      *
      * @param array $data
      * @return array
+     * @since 101.0.0
      */
     protected function customizeAdvancedPriceFormat(array $data)
     {
         $modelId = $this->locator->getProduct()->getId();
-        $fieldCode = AttributeConstantsInterface::CODE_TIER_PRICE;
+        $fieldCode = ProductAttributeInterface::CODE_TIER_PRICE;
 
         if (isset($data[$modelId][self::DATA_SOURCE_DEFAULT][$fieldCode])) {
             foreach ($data[$modelId][self::DATA_SOURCE_DEFAULT][$fieldCode] as &$value) {
-                $value[AttributeConstantsInterface::CODE_TIER_PRICE_FIELD_PRICE] =
-                    $this->formatNumber($value[AttributeConstantsInterface::CODE_TIER_PRICE_FIELD_PRICE]);
-                $value[AttributeConstantsInterface::CODE_TIER_PRICE_FIELD_PRICE_QTY] =
-                    (int)$value[AttributeConstantsInterface::CODE_TIER_PRICE_FIELD_PRICE_QTY];
+                $value[ProductAttributeInterface::CODE_TIER_PRICE_FIELD_PRICE] =
+                    $this->formatPrice($value[ProductAttributeInterface::CODE_TIER_PRICE_FIELD_PRICE]);
+                $value[ProductAttributeInterface::CODE_TIER_PRICE_FIELD_PRICE_QTY] =
+                    (float) $value[ProductAttributeInterface::CODE_TIER_PRICE_FIELD_PRICE_QTY];
             }
         }
 
@@ -129,6 +130,7 @@ class General extends AbstractModifier
 
     /**
      * {@inheritdoc}
+     * @since 101.0.0
      */
     public function modifyMeta(array $meta)
     {
@@ -146,13 +148,20 @@ class General extends AbstractModifier
      *
      * @param array $meta
      * @return array
+     * @since 101.0.0
      */
     protected function prepareFirstPanel(array $meta)
     {
-        $generalPanelName = $this->getGeneralPanelName($meta);
-
-        $meta[$generalPanelName]['arguments']['data']['config']['label'] = '';
-        $meta[$generalPanelName]['arguments']['data']['config']['collapsible'] = false;
+        if ($generalPanelCode = $this->getFirstPanelCode($meta)) {
+            $meta[$generalPanelCode] = $this->arrayManager->merge(
+                'arguments/data/config',
+                $meta[$generalPanelCode],
+                [
+                    'label' => '',
+                    'collapsible' => false,
+                ]
+            );
+        }
 
         return $meta;
     }
@@ -162,28 +171,23 @@ class General extends AbstractModifier
      *
      * @param array $meta
      * @return array
+     * @since 101.0.0
      */
     protected function customizeStatusField(array $meta)
     {
         $switcherConfig = [
-            'arguments' => [
-                'data' => [
-                    'config' => [
-                        'dataType' => Form\Element\DataType\Number::NAME,
-                        'formElement' => Form\Element\Checkbox::NAME,
-                        'componentType' => Form\Field::NAME,
-                        'prefer' => 'toggle',
-                        'valueMap' => [
-                            'true' => '1',
-                            'false' => '2'
-                        ],
-                    ],
-                ],
+            'dataType' => Form\Element\DataType\Number::NAME,
+            'formElement' => Form\Element\Checkbox::NAME,
+            'componentType' => Form\Field::NAME,
+            'prefer' => 'toggle',
+            'valueMap' => [
+                'true' => '1',
+                'false' => '2'
             ],
         ];
 
-        $path = $this->getElementArrayPath($meta, AttributeConstantsInterface::CODE_STATUS);
-        $meta = $this->arrayManager->merge($path, $meta, $switcherConfig);
+        $path = $this->arrayManager->findPath(ProductAttributeInterface::CODE_STATUS, $meta, null, 'children');
+        $meta = $this->arrayManager->merge($path . static::META_CONFIG_PATH, $meta, $switcherConfig);
 
         return $meta;
     }
@@ -193,99 +197,66 @@ class General extends AbstractModifier
      *
      * @param array $meta
      * @return array
+     * @since 101.0.0
      */
     protected function customizeWeightField(array $meta)
     {
-        if ($weightPath = $this->getElementArrayPath($meta, AttributeConstantsInterface::CODE_WEIGHT)) {
-            if ($this->locator->getProduct()->getTypeId() !== \Magento\Catalog\Model\Product\Type::TYPE_VIRTUAL) {
-                $weightPath = $this->getElementArrayPath($meta, AttributeConstantsInterface::CODE_WEIGHT);
-                $meta = $this->arrayManager->merge(
-                    $weightPath,
-                    $meta,
-                    [
-                        'arguments' => [
-                            'data' => [
-                                'config' => [
-                                    'dataScope' => AttributeConstantsInterface::CODE_WEIGHT,
-                                    'validation' => [
-                                        'validate-number' => true,
-                                    ],
-                                    'additionalClasses' => 'admin__field-small',
-                                    'addafter' => $this->locator->getStore()->getConfig('general/locale/weight_unit'),
-                                    'imports' => [
-                                        'disabled' => '!${$.provider}:' . self::DATA_SCOPE_PRODUCT
-                                            . '.product_has_weight:value'
-                                    ]
-                                ],
-                            ],
-                        ],
+        $weightPath = $this->arrayManager->findPath(ProductAttributeInterface::CODE_WEIGHT, $meta, null, 'children');
+        $disabled = $this->arrayManager->get($weightPath . '/arguments/data/config/disabled', $meta);
+        if ($weightPath) {
+            $meta = $this->arrayManager->merge(
+                $weightPath . static::META_CONFIG_PATH,
+                $meta,
+                [
+                    'dataScope' => ProductAttributeInterface::CODE_WEIGHT,
+                    'validation' => [
+                        'validate-zero-or-greater' => true
+                    ],
+                    'additionalClasses' => 'admin__field-small',
+                    'addafter' => $this->locator->getStore()->getConfig('general/locale/weight_unit'),
+                    'imports' => $disabled ? [] : [
+                        'disabled' => '!${$.provider}:' . self::DATA_SCOPE_PRODUCT
+                            . '.product_has_weight:value'
                     ]
-                );
+                ]
+            );
 
-                $containerPath = $this->getElementArrayPath(
-                    $meta,
-                    static::CONTAINER_PREFIX . AttributeConstantsInterface::CODE_WEIGHT
-                );
-                $meta = $this->arrayManager->merge($containerPath, $meta, [
-                    'arguments' => [
-                        'data' => [
-                            'config' => [
-                                'component' => 'Magento_Ui/js/form/components/group',
-                            ],
+            $containerPath = $this->arrayManager->findPath(
+                static::CONTAINER_PREFIX . ProductAttributeInterface::CODE_WEIGHT,
+                $meta,
+                null,
+                'children'
+            );
+            $meta = $this->arrayManager->merge($containerPath . static::META_CONFIG_PATH, $meta, [
+                'component' => 'Magento_Ui/js/form/components/group',
+            ]);
+
+            $hasWeightPath = $this->arrayManager->slicePath($weightPath, 0, -1) . '/'
+                . ProductAttributeInterface::CODE_HAS_WEIGHT;
+            $meta = $this->arrayManager->set(
+                $hasWeightPath . static::META_CONFIG_PATH,
+                $meta,
+                [
+
+                    'dataType' => 'boolean',
+                    'formElement' => Form\Element\Select::NAME,
+                    'componentType' => Form\Field::NAME,
+                    'dataScope' => 'product_has_weight',
+                    'label' => '',
+                    'options' => [
+                        [
+                            'label' => __('This item has weight'),
+                            'value' => 1
+                        ],
+                        [
+                            'label' => __('This item has no weight'),
+                            'value' => 0
                         ],
                     ],
-                ]);
-
-                $hasWeightPath = $this->arrayManager->slicePath($weightPath, 0, -1) . '/'
-                    . AttributeConstantsInterface::CODE_HAS_WEIGHT;
-                $meta = $this->arrayManager->set(
-                    $hasWeightPath,
-                    $meta,
-                    [
-                        'arguments' => [
-                            'data' => [
-                                'config' => [
-                                    'dataType' => 'boolean',
-                                    'formElement' => Form\Element\Select::NAME,
-                                    'componentType' => Form\Field::NAME,
-                                    'dataScope' => 'product_has_weight',
-                                    'label' => '',
-                                    'options' => [
-                                        [
-                                            'label' => __('This item has weight'),
-                                            'value' => 1
-                                        ],
-                                        [
-                                            'label' => __('This item has no weight'),
-                                            'value' => 0
-                                        ],
-                                    ],
-                                    'value' => (int)$this->locator->getProduct()->getTypeInstance()->hasWeight(),
-                                ],
-                            ],
-                        ]
-                    ]
-                );
-
-                $meta = $this->grouper->groupMetaElements(
-                    $meta,
-                    [AttributeConstantsInterface::CODE_WEIGHT, AttributeConstantsInterface::CODE_HAS_WEIGHT],
-                    [
-                        'meta' => [
-                            'arguments' => [
-                                'data' => [
-                                    'config' => [
-                                        'dataScope' => '',
-                                        'breakLine' => false,
-                                        'scopeLabel' => $this->arrayManager->get($weightPath . '/scopeLabel', $meta)
-                                    ],
-                                ],
-                            ],
-                        ],
-                        'targetCode' => 'container_' . AttributeConstantsInterface::CODE_WEIGHT
-                    ]
-                );
-            }
+                    'value' => (int)$this->locator->getProduct()->getTypeInstance()->hasWeight(),
+                    'disabled' => $disabled,
+                ]
+            );
         }
 
         return $meta;
@@ -296,37 +267,49 @@ class General extends AbstractModifier
      *
      * @param array $meta
      * @return array
+     * @since 101.0.0
      */
     protected function customizeNewDateRangeField(array $meta)
     {
         $fromField = 'news_from_date';
         $toField = 'news_to_date';
 
-        $fromFieldPath = $this->getElementArrayPath($meta, $fromField);
-        $toFieldPath = $this->getElementArrayPath($meta, $toField);
+        $fromFieldPath = $this->arrayManager->findPath($fromField, $meta, null, 'children');
+        $toFieldPath = $this->arrayManager->findPath($toField, $meta, null, 'children');
 
         if ($fromFieldPath && $toFieldPath) {
             $fromContainerPath = $this->arrayManager->slicePath($fromFieldPath, 0, -2);
             $toContainerPath = $this->arrayManager->slicePath($toFieldPath, 0, -2);
-            $scopeLabel = $this->arrayManager->get($fromFieldPath . self::META_CONFIG_PATH . '/scopeLabel', $meta);
+            $commonFieldsMeta = [
+                'outputDateTimeToISO' => false,
+                'inputDateTimeFormat' => 'YYYY-MM-DD h:mm',
+                'options' => [
+                    'showsTime' => true,
+                ]
+            ];
 
             $meta = $this->arrayManager->merge(
                 $fromFieldPath . self::META_CONFIG_PATH,
                 $meta,
-                [
-                    'label' => __('Set Product as New From'),
-                    'scopeLabel' => null,
-                    'additionalClasses' => 'admin__field-date',
-                ]
+                array_merge(
+                    [
+                        'label' => __('Set Product as New From'),
+                        'additionalClasses' => 'admin__field-date',
+                    ],
+                    $commonFieldsMeta
+                )
             );
             $meta = $this->arrayManager->merge(
                 $toFieldPath . self::META_CONFIG_PATH,
                 $meta,
-                [
-                    'label' => __('To'),
-                    'scopeLabel' => null,
-                    'additionalClasses' => 'admin__field-date',
-                ]
+                array_merge(
+                    [
+                        'label' => __('To'),
+                        'scopeLabel' => null,
+                        'additionalClasses' => 'admin__field-date',
+                    ],
+                    $commonFieldsMeta
+                )
             );
             $meta = $this->arrayManager->merge(
                 $fromContainerPath . self::META_CONFIG_PATH,
@@ -336,7 +319,6 @@ class General extends AbstractModifier
                     'additionalClasses' => 'admin__control-grouped-date',
                     'breakLine' => false,
                     'component' => 'Magento_Ui/js/form/components/group',
-                    'scopeLabel' => $scopeLabel,
                 ]
             );
             $meta = $this->arrayManager->set(
@@ -345,7 +327,7 @@ class General extends AbstractModifier
                 $this->arrayManager->get($toFieldPath, $meta)
             );
 
-            $meta =  $this->arrayManager->remove($toContainerPath, $meta);
+            $meta = $this->arrayManager->remove($toContainerPath, $meta);
         }
 
         return $meta;
@@ -356,63 +338,112 @@ class General extends AbstractModifier
      *
      * @param array $meta
      * @return array
+     * @since 101.0.0
      */
     protected function customizeNameListeners(array $meta)
     {
         $listeners = [
-            AttributeConstantsInterface::CODE_SKU,
-            AttributeConstantsInterface::CODE_SEO_FIELD_META_TITLE,
-            AttributeConstantsInterface::CODE_SEO_FIELD_META_KEYWORD,
-            AttributeConstantsInterface::CODE_SEO_FIELD_META_DESCRIPTION,
+            ProductAttributeInterface::CODE_SKU,
+            ProductAttributeInterface::CODE_SEO_FIELD_META_TITLE,
+            ProductAttributeInterface::CODE_SEO_FIELD_META_KEYWORD,
+            ProductAttributeInterface::CODE_SEO_FIELD_META_DESCRIPTION,
         ];
+        $textListeners = [
+            ProductAttributeInterface::CODE_SEO_FIELD_META_KEYWORD,
+            ProductAttributeInterface::CODE_SEO_FIELD_META_DESCRIPTION
+        ];
+
         foreach ($listeners as $listener) {
-            $listenerPath = $this->getElementArrayPath($meta, $listener);
+            $listenerPath = $this->arrayManager->findPath($listener, $meta, null, 'children');
             $importsConfig = [
-                'arguments' => [
-                    'data' => [
-                        'config' => [
-                            'component' => 'Magento_Catalog/js/components/import-handler',
-                            'imports' => [
-                                'handleChanges' => '${$.provider}:data.product.name',
-                            ],
-                        ],
-                    ],
-                ],
+                'mask' => $this->locator->getStore()->getConfig('catalog/fields_masks/' . $listener),
+                'component' => 'Magento_Catalog/js/components/import-handler',
+                'allowImport' => !$this->locator->getProduct()->getId(),
             ];
 
-            $meta = $this->arrayManager->merge($listenerPath, $meta, $importsConfig);
+            if (!in_array($listener, $textListeners)) {
+                $importsConfig['elementTmpl'] = 'ui/form/element/input';
+            }
+
+            $meta = $this->arrayManager->merge($listenerPath . static::META_CONFIG_PATH, $meta, $importsConfig);
         }
 
-        $skuPath = $this->getElementArrayPath($meta, AttributeConstantsInterface::CODE_SKU);
+        $skuPath = $this->arrayManager->findPath(ProductAttributeInterface::CODE_SKU, $meta, null, 'children');
         $meta = $this->arrayManager->merge(
-            $skuPath,
+            $skuPath . static::META_CONFIG_PATH,
             $meta,
             [
-                'arguments' => [
-                    'data' => [
-                        'config' => [
-                            'autoImportIfEmpty' => true,
-                            'allowImport' => $this->locator->getProduct()->getId() ? false : true,
-                        ],
-                    ],
-                ],
+                'autoImportIfEmpty' => true
             ]
         );
 
-        $namePath = $this->getElementArrayPath($meta, AttributeConstantsInterface::CODE_NAME);
+        $namePath = $this->arrayManager->findPath(ProductAttributeInterface::CODE_NAME, $meta, null, 'children');
 
         return $this->arrayManager->merge(
-            $namePath,
+            $namePath . static::META_CONFIG_PATH,
             $meta,
             [
-                'arguments' => [
-                    'data' => [
-                        'config' => [
-                            'valueUpdate' => 'keyup'
-                        ],
-                    ],
-                ],
+                'valueUpdate' => 'keyup'
             ]
         );
+    }
+
+    /**
+     * The getter function to get the locale currency for real application code
+     *
+     * @return \Magento\Framework\Locale\CurrencyInterface
+     *
+     * @deprecated 101.0.0
+     */
+    private function getLocaleCurrency()
+    {
+        if ($this->localeCurrency === null) {
+            $this->localeCurrency = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\Locale\CurrencyInterface::class);
+        }
+        return $this->localeCurrency;
+    }
+
+    /**
+     * Format price according to the locale of the currency
+     *
+     * @param mixed $value
+     * @return string
+     * @since 101.0.0
+     */
+    protected function formatPrice($value)
+    {
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $store = $this->locator->getStore();
+        $currency = $this->getLocaleCurrency()->getCurrency($store->getBaseCurrencyCode());
+        $value = $currency->toCurrency($value, ['display' => \Magento\Framework\Currency::NO_SYMBOL]);
+
+        return $value;
+    }
+
+    /**
+     * Format number according to the locale of the currency and precision of input
+     *
+     * @param mixed $value
+     * @return string
+     * @since 101.0.0
+     */
+    protected function formatNumber($value)
+    {
+        if (!is_numeric($value)) {
+            return null;
+        }
+
+        $value = (float)$value;
+        $precision = strlen(substr(strrchr($value, "."), 1));
+        $store = $this->locator->getStore();
+        $currency = $this->getLocaleCurrency()->getCurrency($store->getBaseCurrencyCode());
+        $value = $currency->toCurrency($value, ['display' => \Magento\Framework\Currency::NO_SYMBOL,
+                                                'precision' => $precision]);
+
+        return $value;
     }
 }

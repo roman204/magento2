@@ -1,8 +1,11 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
+/**
+ * @api
+ */
 define([
     'jquery',
     'underscore',
@@ -42,6 +45,7 @@ define([
      */
     $.widget('mage.modal', {
         options: {
+            id: null,
             type: 'popup',
             title: '',
             subTitle: '',
@@ -84,28 +88,29 @@ define([
                 click: function (event) {
                     this.closeModal(event);
                 }
-            }]
-        },
-        keyEventHandlers: {
+            }],
+            keyEventHandlers: {
 
-            /**
-             * Tab key press handler,
-             * set focus to elements
-             */
-            tabKey: function () {
-                if (document.activeElement === this.modal[0]) {
-                    this._setFocus('start');
-                }
-            },
+                /**
+                 * Tab key press handler,
+                 * set focus to elements
+                 */
+                tabKey: function () {
+                    if (document.activeElement === this.modal[0]) {
+                        this._setFocus('start');
+                    }
+                },
 
-            /**
-             * Escape key press handler,
-             * close modal window
-             */
-            escapeKey: function () {
-                if (this.options.isOpen && this.modal.find(document.activeElement).length ||
-                    this.options.isOpen && this.modal[0] === document.activeElement) {
-                    this.closeModal();
+                /**
+                 * Escape key press handler,
+                 * close modal window
+                 * @param {Object} event - event
+                 */
+                escapeKey: function (event) {
+                    if (this.options.isOpen && this.modal.find(document.activeElement).length ||
+                        this.options.isOpen && this.modal[0] === document.activeElement) {
+                        this.closeModal(event);
+                    }
                 }
             }
         },
@@ -121,7 +126,7 @@ define([
                 'closeModal'
             );
 
-            _.extend(this.keyEventHandlers, this.options.keyEventHandlers);
+            this.options.id = this.uuid;
             this.options.transitionEvent = transitionEvent;
             this._createWrapper();
             this._renderModal();
@@ -172,8 +177,8 @@ define([
         keyEventSwitcher: function (event) {
             var key = keyCodes[event.keyCode];
 
-            if (this.keyEventHandlers.hasOwnProperty(key)) {
-                this.keyEventHandlers[key].apply(this, arguments);
+            if (this.options.keyEventHandlers.hasOwnProperty(key)) {
+                this.options.keyEventHandlers[key].apply(this, arguments);
             }
         },
 
@@ -222,8 +227,8 @@ define([
             this._createOverlay();
             this._setActive();
             this._setKeyListener();
-            this.modal.one(this.options.transitionEvent, _.bind(this._trigger, this, 'opened'));
             this.modal.one(this.options.transitionEvent, _.bind(this._setFocus, this, 'end', 'opened'));
+            this.modal.one(this.options.transitionEvent, _.bind(this._trigger, this, 'opened'));
             this.modal.addClass(this.options.modalVisibleClass);
 
             if (!this.options.transitionEvent) {
@@ -332,11 +337,12 @@ define([
          * Set z-index and margin for modal and overlay.
          */
         _setActive: function () {
-            var zIndex = this.modal.zIndex();
+            var zIndex = this.modal.zIndex(),
+                baseIndex = zIndex + this._getVisibleCount();
 
+            this.overlay.zIndex(++baseIndex);
             this.prevOverlayIndex = this.overlay.zIndex();
-            this.modal.zIndex(zIndex + this._getVisibleCount());
-            this.overlay.zIndex(zIndex + (this._getVisibleCount() - 1));
+            this.modal.zIndex(this.overlay.zIndex() + 1);
 
             if (this._getVisibleSlideCount()) {
                 this.modal.css('marginLeft', this.options.modalLeftMargin * this._getVisibleSlideCount());
@@ -350,7 +356,14 @@ define([
             this.modal.removeAttr('style');
 
             if (this.overlay) {
-                this.overlay.zIndex(this.prevOverlayIndex);
+                // In cases when one modal is closed but there is another modal open (e.g. admin notifications)
+                // to avoid collisions between overlay and modal zIndexes
+                // overlay zIndex is set to be less than modal one
+                if (this._getVisibleCount() === 1) {
+                    this.overlay.zIndex(this.prevOverlayIndex - 1);
+                } else {
+                    this.overlay.zIndex(this.prevOverlayIndex);
+                }
             }
         },
 
@@ -358,7 +371,7 @@ define([
          * Creates wrapper to hold all modals.
          */
         _createWrapper: function () {
-            this.modalWrapper = $('.' + this.options.wrapperClass);
+            this.modalWrapper = $(this.options.appendTo).find('.' + this.options.wrapperClass);
 
             if (!this.modalWrapper.length) {
                 this.modalWrapper = $('<div></div>')
@@ -377,7 +390,11 @@ define([
                     data: this.options
                 })).appendTo(this.modalWrapper);
             this.modal = this.modalWrapper.find(this.options.modalBlock).last();
-            this.element.show().appendTo(this._getElem(this.options.modalContent));
+            this.element.appendTo(this._getElem(this.options.modalContent));
+
+            if (this.element.is(':hidden')) {
+                this.element.show();
+            }
         },
 
         /**

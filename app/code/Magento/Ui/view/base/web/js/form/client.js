@@ -1,7 +1,8 @@
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
+
 define([
     'jquery',
     'underscore',
@@ -15,13 +16,14 @@ define([
      *
      * @param {Object} data
      * @param {String} url
+     * @param {String} selectorPrefix
+     * @param {String} messagesClass
      * @returns {*}
      */
-    function beforeSave(data, url) {
+    function beforeSave(data, url, selectorPrefix, messagesClass) {
         var save = $.Deferred();
 
-        data = utils.serialize(data);
-
+        data = utils.serialize(utils.filterFormData(data));
         data['form_key'] = window.FORM_KEY;
 
         if (!url || url === 'undefined') {
@@ -47,7 +49,7 @@ define([
                 }
 
                 $('body').notification('clear');
-                $.each(resp.messages, function (key, message) {
+                $.each(resp.messages || [resp.message] || [], function (key, message) {
                     $('body').notification('add', {
                         error: resp.error,
                         message: message,
@@ -58,7 +60,9 @@ define([
                          * @param {String} msg
                          */
                         insertMethod: function (msg) {
-                            $('.page-main-actions').after(msg);
+                            var $wrapper = $('<div/>').addClass(messagesClass).html(msg);
+
+                            $('.page-main-actions', selectorPrefix).after($wrapper);
                         }
                     });
                 });
@@ -84,7 +88,7 @@ define([
             var url = this.urls.beforeSave,
                 save = this._save.bind(this, data, options);
 
-            beforeSave(data, url).then(save);
+            beforeSave(data, url, this.selectorPrefix, this.messagesClass).then(save);
 
             return this;
         },
@@ -100,6 +104,7 @@ define([
         _save: function (data, options) {
             var url = this.urls.save;
 
+            $('body').trigger('processStart');
             options = options || {};
 
             if (!options.redirect) {
@@ -111,6 +116,8 @@ define([
                     url: url,
                     data: data
                 }, options);
+
+                $('body').trigger('processStop');
 
                 return this;
             }

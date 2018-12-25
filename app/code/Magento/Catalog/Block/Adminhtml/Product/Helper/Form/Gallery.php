@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -13,6 +13,8 @@
  */
 namespace Magento\Catalog\Block\Adminhtml\Product\Helper\Form;
 
+use Magento\Framework\App\ObjectManager;
+use Magento\Framework\App\Request\DataPersistorInterface;
 use Magento\Framework\Registry;
 use Magento\Catalog\Model\Product;
 use Magento\Eav\Model\Entity\Attribute;
@@ -22,23 +24,36 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
 {
     /**
      * Gallery field name suffix
+     *
+     * @var string
      */
-    private static $FIELD_NAME_SUFFIX = 'product';
+    protected $fieldNameSuffix = 'product';
 
     /**
      * Gallery html id
+     *
+     * @var string
      */
-    private static $HTML_ID = 'media_gallery';
+    protected $htmlId = 'media_gallery';
 
     /**
      * Gallery name
+     *
+     * @var string
      */
-    private static $NAME = 'product[media_gallery]';
+    protected $name = 'product[media_gallery]';
 
     /**
      * Html id for data scope
+     *
+     * @var string
      */
-    private static $IMAGE = 'image';
+    protected $image = 'image';
+
+    /**
+     * @var string
+     */
+    protected $formName = 'product_form';
 
     /**
      * @var \Magento\Store\Model\StoreManagerInterface
@@ -56,6 +71,11 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
     protected $registry;
 
     /**
+     * @var DataPersistorInterface
+     */
+    private $dataPersistor;
+
+    /**
      * @param \Magento\Framework\View\Element\Context $context
      * @param \Magento\Store\Model\StoreManagerInterface $storeManager
      * @param Registry $registry
@@ -67,11 +87,13 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
         \Magento\Store\Model\StoreManagerInterface $storeManager,
         Registry $registry,
         \Magento\Framework\Data\Form $form,
-        $data = []
+        $data = [],
+        DataPersistorInterface $dataPersistor = null
     ) {
         $this->storeManager = $storeManager;
         $this->registry = $registry;
         $this->form = $form;
+        $this->dataPersistor = $dataPersistor ?: ObjectManager::getInstance()->get(DataPersistorInterface::class);
         parent::__construct($context, $data);
     }
 
@@ -91,7 +113,24 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
      */
     public function getImages()
     {
-        return $this->registry->registry('current_product')->getData('media_gallery') ?: null;
+        $images = $this->getDataObject()->getData('media_gallery') ?: null;
+        if ($images === null) {
+            $images = ((array)$this->dataPersistor->get('catalog_product'))['product']['media_gallery'] ?? null;
+        }
+
+        return $images;
+    }
+
+    /**
+     * Get value for given type.
+     *
+     * @param string $type
+     * @return string|null
+     */
+    public function getImageValue(string $type)
+    {
+        $product = (array)$this->dataPersistor->get('catalog_product');
+        return $product['product'][$type] ?? null;
     }
 
     /**
@@ -102,8 +141,9 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
     public function getContentHtml()
     {
         /* @var $content \Magento\Catalog\Block\Adminhtml\Product\Helper\Form\Gallery\Content */
-        $content = $this->_layout->createBlock('Magento\Catalog\Block\Adminhtml\Product\Helper\Form\Gallery\Content');
+        $content = $this->getChildBlock('content');
         $content->setId($this->getHtmlId() . '_content')->setElement($this);
+        $content->setFormName($this->formName);
         $galleryJs = $content->getJsObjectName();
         $content->getUploader()->getConfig()->setMegiaGallery($galleryJs);
         return $content->toHtml();
@@ -114,7 +154,7 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
      */
     protected function getHtmlId()
     {
-        return static::$HTML_ID;
+        return $this->htmlId;
     }
 
     /**
@@ -122,7 +162,7 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
      */
     public function getName()
     {
-        return static::$NAME;
+        return $this->name;
     }
 
     /**
@@ -130,7 +170,7 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
      */
     public function getFieldNameSuffix()
     {
-        return static::$FIELD_NAME_SUFFIX;
+        return $this->fieldNameSuffix;
     }
 
     /**
@@ -138,7 +178,7 @@ class Gallery extends \Magento\Framework\View\Element\AbstractBlock
      */
     public function getDataScopeHtmlId()
     {
-        return static::$IMAGE;
+        return $this->image;
     }
 
     /**

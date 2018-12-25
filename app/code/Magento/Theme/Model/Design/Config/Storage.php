@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Theme\Model\Design\Config;
@@ -15,13 +15,19 @@ use Magento\Theme\Model\Design\BackendModelFactory;
 
 class Storage
 {
-    /** @var TransactionFactory */
+    /**
+     * @var \Magento\Framework\DB\TransactionFactory
+     */
     protected $transactionFactory;
 
-    /** @var BackendModelFactory */
+    /**
+     * @var \Magento\Theme\Model\Design\BackendModelFactory
+     */
     protected $backendModelFactory;
 
-    /** @var ValueChecker */
+    /**
+     * @var \Magento\Theme\Model\Design\Config\ValueChecker
+     */
     protected $valueChecker;
 
     /**
@@ -77,12 +83,17 @@ class Storage
         foreach ($fieldsData as &$fieldData) {
             $value = $this->valueProcessor->process(
                 $this->scopeConfig->getValue($fieldData->getPath(), $scope, $scopeId),
-                $fieldData->getPath()
+                $scope,
+                $scopeId,
+                $fieldData->getFieldConfig()
             );
-            if ($value !== null) {
-                $fieldData->setValue($value);
+
+            if ($value === null) {
+                $value = '';
             }
+            $fieldData->setValue($value);
         }
+
         return $designConfig;
     }
 
@@ -113,7 +124,7 @@ class Storage
                     $fieldData->getValue(),
                     $designConfig->getScope(),
                     $designConfig->getScopeId(),
-                    $fieldData->getFieldConfig()['path']
+                    $fieldData->getFieldConfig()
                 )
             ) {
                 $saveTransaction->addObject($backendModel);

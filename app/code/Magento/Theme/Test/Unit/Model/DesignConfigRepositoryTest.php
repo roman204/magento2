@@ -1,14 +1,15 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Theme\Test\Unit\Model;
 
 use Magento\Theme\Model\Data\Design\Config;
 use Magento\Theme\Model\DesignConfigRepository;
+use Magento\Framework\TestFramework\Unit\Helper\ObjectManager;
 
-class DesignConfigRepositoryTest extends \PHPUnit_Framework_TestCase
+class DesignConfigRepositoryTest extends \PHPUnit\Framework\TestCase
 {
     /** @var \Magento\Theme\Model\Design\Config\Storage|\PHPUnit_Framework_MockObject_MockObject */
     protected $configStorage;
@@ -34,24 +35,29 @@ class DesignConfigRepositoryTest extends \PHPUnit_Framework_TestCase
     /** @var DesignConfigRepository */
     protected $repository;
 
+    /**
+     * @var \PHPUnit_Framework_MockObject_MockObject
+     */
+    protected $validator;
+
     public function setUp()
     {
-        $this->configStorage = $this->getMock('Magento\Theme\Model\Design\Config\Storage', [], [], '', false);
+        $this->configStorage = $this->createMock(\Magento\Theme\Model\Design\Config\Storage::class);
         $this->reinitableConfig = $this->getMockForAbstractClass(
-            'Magento\Framework\App\Config\ReinitableConfigInterface',
+            \Magento\Framework\App\Config\ReinitableConfigInterface::class,
             [],
             '',
             false
         );
-        $this->indexerRegistry = $this->getMock('Magento\Framework\Indexer\IndexerRegistry', [], [], '', false);
+        $this->indexerRegistry = $this->createMock(\Magento\Framework\Indexer\IndexerRegistry::class);
         $this->designConfig = $this->getMockForAbstractClass(
-            'Magento\Theme\Api\Data\DesignConfigInterface',
+            \Magento\Theme\Api\Data\DesignConfigInterface::class,
             [],
             '',
             false
         );
         $this->designExtension = $this->getMockForAbstractClass(
-            'Magento\Theme\Api\Data\DesignConfigExtensionInterface',
+            \Magento\Theme\Api\Data\DesignConfigExtensionInterface::class,
             [],
             '',
             false,
@@ -60,21 +66,28 @@ class DesignConfigRepositoryTest extends \PHPUnit_Framework_TestCase
             ['getDesignConfigData']
         );
         $this->designConfigData = $this->getMockForAbstractClass(
-            'Magento\Theme\Api\Data\DesignConfigDataInterface',
+            \Magento\Theme\Api\Data\DesignConfigDataInterface::class,
             [],
             '',
             false
         );
         $this->indexer = $this->getMockForAbstractClass(
-            'Magento\Framework\Indexer\IndexerInterface',
+            \Magento\Framework\Indexer\IndexerInterface::class,
             [],
             '',
             false
         );
-        $this->repository = new DesignConfigRepository(
-            $this->configStorage,
-            $this->reinitableConfig,
-            $this->indexerRegistry
+
+        $this->validator = $this->createMock(\Magento\Theme\Model\Design\Config\Validator::class);
+        $objectManagerHelper = new ObjectManager($this);
+        $this->repository = $objectManagerHelper->getObject(
+            DesignConfigRepository::class,
+            [
+                'configStorage' => $this->configStorage,
+                'reinitableConfig' => $this->reinitableConfig,
+                'indexerRegistry' => $this->indexerRegistry,
+                'validator' => $this->validator
+            ]
         );
     }
 
@@ -97,6 +110,7 @@ class DesignConfigRepositoryTest extends \PHPUnit_Framework_TestCase
             ->willReturn($this->indexer);
         $this->indexer->expects($this->once())
             ->method('reindexAll');
+        $this->validator->expects($this->once())->method('validate')->with($this->designConfig);
         $this->assertSame($this->designConfig, $this->repository->save($this->designConfig));
     }
 

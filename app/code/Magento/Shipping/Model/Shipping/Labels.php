@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -117,12 +117,11 @@ class Labels extends \Magento\Shipping\Model\Shipping
             )
         );
 
-        if (!$admin->getFirstname()
-            || !$admin->getLastname()
+        if (!$admin->getFirstName()
+            || !$admin->getLastName()
             || !$storeInfo->getName()
             || !$storeInfo->getPhone()
             || !$originStreet1
-            || !$shipperRegionCode
             || !$this->_scopeConfig->getValue(
                 Shipment::XML_PATH_STORE_CITY,
                 ScopeInterface::SCOPE_STORE,
@@ -188,8 +187,8 @@ class Labels extends \Magento\Shipping\Model\Shipping
         );
 
         $request->setShipperContactPersonName($storeAdmin->getName());
-        $request->setShipperContactPersonFirstName($storeAdmin->getFirstname());
-        $request->setShipperContactPersonLastName($storeAdmin->getLastname());
+        $request->setShipperContactPersonFirstName($storeAdmin->getFirstName());
+        $request->setShipperContactPersonLastName($storeAdmin->getLastName());
         $request->setShipperContactCompanyName($store->getName());
         $request->setShipperContactPhoneNumber($store->getPhone());
         $request->setShipperEmail($storeAdmin->getEmail());
@@ -228,8 +227,6 @@ class Labels extends \Magento\Shipping\Model\Shipping
      */
     protected function setRecipientDetails(Request $request, Address $address)
     {
-        $recipientRegionCode = $this->_regionFactory->create()->load($address->getRegionId())->getCode();
-
         $request->setRecipientContactPersonName(trim($address->getFirstname() . ' ' . $address->getLastname()));
         $request->setRecipientContactPersonFirstName($address->getFirstname());
         $request->setRecipientContactPersonLastName($address->getLastname());
@@ -240,8 +237,8 @@ class Labels extends \Magento\Shipping\Model\Shipping
         $request->setRecipientAddressStreet1($address->getStreetLine(1));
         $request->setRecipientAddressStreet2($address->getStreetLine(2));
         $request->setRecipientAddressCity($address->getCity());
-        $request->setRecipientAddressStateOrProvinceCode($recipientRegionCode ?: $address->getRegionCode());
-        $request->setRecipientAddressRegionCode($recipientRegionCode);
+        $request->setRecipientAddressStateOrProvinceCode($address->getRegionCode() ?: $address->getRegion());
+        $request->setRecipientAddressRegionCode($address->getRegionCode());
         $request->setRecipientAddressPostalCode($address->getPostcode());
         $request->setRecipientAddressCountryCode($address->getCountryId());
     }

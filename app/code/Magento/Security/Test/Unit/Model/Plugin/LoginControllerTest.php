@@ -1,17 +1,18 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 namespace Magento\Security\Test\Unit\Model\Plugin;
 
 use Magento\Framework\TestFramework\Unit\Helper\ObjectManager;
+use Magento\Security\Model\SecurityCookie;
 
 /**
  * Test class for \Magento\Security\Model\Plugin\LoginController testing
  */
-class LoginControllerTest extends \PHPUnit_Framework_TestCase
+class LoginControllerTest extends \PHPUnit\Framework\TestCase
 {
     /** @var  \Magento\Security\Model\Plugin\LoginController */
     protected $controller;
@@ -22,8 +23,8 @@ class LoginControllerTest extends \PHPUnit_Framework_TestCase
     /** @var \Magento\Security\Model\AdminSessionsManager */
     protected $adminSessionsManagerMock;
 
-    /** @var \Magento\Security\Helper\SecurityCookie */
-    protected $securityCookieHelperMock;
+    /** @var SecurityCookie */
+    protected $securityCookieMock;
 
     /** @var \Magento\Backend\Controller\Adminhtml\Auth\Login */
     protected $backendControllerAuthLoginMock;
@@ -42,52 +43,31 @@ class LoginControllerTest extends \PHPUnit_Framework_TestCase
     {
         $this->objectManager = new ObjectManager($this);
 
-        $this->messageManagerMock = $this->getMock(
-            '\Magento\Framework\Message\ManagerInterface',
-            [],
-            [],
-            '',
-            false
+        $this->messageManagerMock = $this->createMock(\Magento\Framework\Message\ManagerInterface::class);
+
+        $this->adminSessionsManagerMock = $this->createPartialMock(
+            \Magento\Security\Model\AdminSessionsManager::class,
+            ['getLogoutReasonMessageByStatus']
         );
 
-        $this->adminSessionsManagerMock = $this->getMock(
-            '\Magento\Security\Model\AdminSessionsManager',
-            ['getLogoutReasonMessageByStatus'],
-            [],
-            '',
-            false
+        $this->securityCookieMock = $this->createPartialMock(
+            SecurityCookie::class,
+            ['getLogoutReasonCookie', 'deleteLogoutReasonCookie']
         );
 
-        $this->securityCookieHelperMock = $this->getMock(
-            '\Magento\Security\Helper\SecurityCookie',
-            ['getLogoutReasonCookie', 'deleteLogoutReasonCookie'],
-            [],
-            '',
-            false
+        $this->backendControllerAuthLoginMock = $this->createPartialMock(
+            \Magento\Backend\Controller\Adminhtml\Auth\Login::class,
+            ['getRequest', 'getUrl']
         );
 
-        $this->backendControllerAuthLoginMock = $this->getMock(
-            '\Magento\Backend\Controller\Adminhtml\Auth\Login',
-            ['getRequest', 'getUrl'],
-            [],
-            '',
-            false
-        );
-
-        $this->requestMock = $this->getMock(
-            '\Magento\Framework\App\Request\Http',
-            ['getUri'],
-            [],
-            '',
-            false
-        );
+        $this->requestMock = $this->createPartialMock(\Magento\Framework\App\Request\Http::class, ['getUri']);
 
         $this->controller = $this->objectManager->getObject(
-            '\Magento\Security\Model\Plugin\LoginController',
+            \Magento\Security\Model\Plugin\LoginController::class,
             [
                 'messageManager' => $this->messageManagerMock,
                 'sessionsManager' => $this->adminSessionsManagerMock,
-                'securityCookieHelper' => $this->securityCookieHelperMock
+                'securityCookie' => $this->securityCookieMock
             ]
         );
     }
@@ -101,7 +81,7 @@ class LoginControllerTest extends \PHPUnit_Framework_TestCase
         $uri = '/uri/';
         $errorMessage = 'Error Message';
 
-        $this->securityCookieHelperMock->expects($this->once())
+        $this->securityCookieMock->expects($this->once())
             ->method('getLogoutReasonCookie')
             ->willReturn($logoutReasonCode);
 
@@ -123,10 +103,10 @@ class LoginControllerTest extends \PHPUnit_Framework_TestCase
             ->willReturn($errorMessage);
 
         $this->messageManagerMock->expects($this->once())
-            ->method('addError')
+            ->method('addErrorMessage')
             ->with($errorMessage);
 
-        $this->securityCookieHelperMock->expects($this->once())
+        $this->securityCookieMock->expects($this->once())
             ->method('deleteLogoutReasonCookie')
             ->willReturnSelf();
 

@@ -1,7 +1,13 @@
 // /**
-//  * Copyright © 2015 Magento. All rights reserved.
+//  * Copyright © Magento, Inc. All rights reserved.
 //  * See COPYING.txt for license details.
 //  */
+
+//
+//  Variables
+//  _____________________________________________
+
+@active-nav-indent: 54px;
 
 //
 //  Common
@@ -42,7 +48,6 @@
 //  Mobile
 //  _____________________________________________
 
-@active-nav-indent: 54px;
 .media-width(@extremum, @break) when (@extremum = 'max') and (@break = @screen__m) {
     .navigation {
         padding: 0;
@@ -74,20 +79,21 @@
     }
 
     .nav-sections {
+        -webkit-overflow-scrolling: touch;
         .lib-css(transition, left .3s, 1);
         height: 100%;
         left: -80%;
-        left: calc(~"-1 * (100% - @{active-nav-indent})");
+        left: calc(~'-1 * (100% - @{active-nav-indent})');
         overflow: auto;
         position: fixed;
         top: 0;
         width: 80%;
-        width: calc(~"100% - @{active-nav-indent}");
+        width: calc(~'100% - @{active-nav-indent}');
 
         .switcher {
             border-top: 1px solid @color-gray82;
             font-size: 1.6rem;
-            font-weight: 700;
+            font-weight: @font-weight__bold;
             margin: 0;
             padding: .8rem 3.5rem .8rem 2rem;
 
@@ -141,7 +147,7 @@
 
                 &.greet.welcome {
                     border-top: 1px solid @color-gray82;
-                    font-weight: 700;
+                    font-weight: @font-weight__bold;
                     padding: .8rem @indent__base;
                 }
 
@@ -155,7 +161,7 @@
                 .lib-css(color, @navigation-level0-item__color);
                 .lib-css(text-decoration, @navigation-level0-item__text-decoration);
                 display: block;
-                font-weight: 700;
+                font-weight: @font-weight__bold;
                 padding: .8rem @indent__base;
             }
 
@@ -189,12 +195,12 @@
     .nav-open {
         .page-wrapper {
             left: 80%;
-            left: calc(~"100% - @{active-nav-indent}");
+            left: calc(~'100% - @{active-nav-indent}');
         }
 
         .nav-sections {
             @_shadow: 0 0 5px 0 rgba(50, 50, 50, .75);
-            
+
             .lib-css(box-shadow, @_shadow, 1);
             left: 0;
             z-index: 99;
@@ -202,12 +208,12 @@
 
         .nav-toggle {
             &:after{
-                background: rgba(0,0,0,.01);
+                background: rgba(0, 0, 0, @overlay__opacity);
                 content: '';
                 display: block;
                 height: 100%;
                 position: fixed;
-                right:0;
+                right: 0;
                 top: 0;
                 width: 100%;
                 z-index: 1;

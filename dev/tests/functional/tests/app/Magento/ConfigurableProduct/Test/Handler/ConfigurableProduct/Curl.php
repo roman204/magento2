@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -50,12 +50,33 @@ class Curl extends ProductCurl implements ConfigurableProductInterface
         $attributeSetId = $data['product']['attribute_set_id'];
 
         $data['product']['configurable_attributes_data'] = $this->prepareAttributesData($configurableAttributesData);
-        $data['variations-matrix'] = $this->prepareVariationsMatrix($fixture);
+        $data['configurable-matrix'] = $this->prepareConfigurableMatrix($fixture);
         $data['attributes'] = $this->prepareAttributes($configurableAttributesData);
         $data['new-variations-attribute-set-id'] = $attributeSetId;
         $data['associated_product_ids'] = $this->prepareAssociatedProductIds($configurableAttributesData);
 
-        return $this->replaceMappingData($data);
+        $this->replaceMappingData($data);
+        $data['configurable-matrix-serialized'] = json_encode($data['configurable-matrix']);
+        $data['associated_product_ids_serialized'] = json_encode($data['associated_product_ids']);
+        return $data;
+    }
+
+    /**
+     * Preparation of websites data.
+     *
+     * @return void
+     */
+    protected function prepareWebsites()
+    {
+        if (!empty($this->fields['product']['website_ids'])) {
+            foreach ($this->fixture->getDataFieldConfig('website_ids')['source']->getWebsites() as $key => $website) {
+                $this->fields['product']['website_ids'][$key] = $website->getWebsiteId();
+            }
+        } else {
+            $website = \Magento\Mtf\ObjectManagerFactory::getObjectManager()
+                ->create(\Magento\Store\Test\Fixture\Website::class, ['dataset' => 'default']);
+            $this->fields['product']['website_ids'][] = $website->getWebsiteId();
+        }
     }
 
     /**
@@ -125,7 +146,7 @@ class Curl extends ProductCurl implements ConfigurableProductInterface
      * @param FixtureInterface $product
      * @return array
      */
-    protected function prepareVariationsMatrix(FixtureInterface $product)
+    protected function prepareConfigurableMatrix(FixtureInterface $product)
     {
         /** @var ConfigurableAttributesData $configurableAttributesData */
         $configurableAttributesData = $product->getDataFieldConfig('configurable_attributes_data')['source'];
@@ -151,13 +172,16 @@ class Curl extends ProductCurl implements ConfigurableProductInterface
                 $keyIds[] = $attribute['options'][$optionKey]['id'];
                 $configurableAttribute[] = sprintf(
                     '"%s":"%s"',
-                    $attribute['attribute_code'],
+                    isset($attribute['attribute_code']) ? $attribute['attribute_code'] : $attribute['frontend_label'],
                     $attribute['options'][$optionKey]['id']
                 );
             }
 
             $keyIds = implode('-', $keyIds);
             $variation['configurable_attribute'] = '{' . implode(',', $configurableAttribute) . '}';
+            $variation['variationKey'] = $keyIds;
+            $variation['newProduct'] = 1;
+            $variation['status'] = 1;
             $result[$keyIds] = $variation;
         }
 

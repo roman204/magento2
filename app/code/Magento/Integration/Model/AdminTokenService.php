@@ -1,6 +1,6 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
@@ -13,16 +13,16 @@ use Magento\Integration\Model\Oauth\Token as Token;
 use Magento\Integration\Model\Oauth\TokenFactory as TokenModelFactory;
 use Magento\Integration\Model\ResourceModel\Oauth\Token\CollectionFactory as TokenCollectionFactory;
 use Magento\User\Model\User as UserModel;
+use Magento\Integration\Model\Oauth\Token\RequestThrottler;
 
 /**
  * Class to handle token generation for Admins
- *
  */
 class AdminTokenService implements \Magento\Integration\Api\AdminTokenServiceInterface
 {
     /**
      * Token Model
-     *a
+     *
      * @var TokenModelFactory
      */
     private $tokenModelFactory;
@@ -45,6 +45,11 @@ class AdminTokenService implements \Magento\Integration\Api\AdminTokenServiceInt
      * @var TokenCollectionFactory
      */
     private $tokenModelCollectionFactory;
+
+    /**
+     * @var RequestThrottler
+     */
+    private $requestThrottler;
 
     /**
      * Initialize service
@@ -72,8 +77,10 @@ class AdminTokenService implements \Magento\Integration\Api\AdminTokenServiceInt
     public function createAdminAccessToken($username, $password)
     {
         $this->validatorHelper->validate($username, $password);
+        $this->getRequestThrottler()->throttle($username, RequestThrottler::USER_TYPE_ADMIN);
         $this->userModel->login($username, $password);
         if (!$this->userModel->getId()) {
+            $this->getRequestThrottler()->logAuthenticationFailure($username, RequestThrottler::USER_TYPE_ADMIN);
             /*
              * This message is same as one thrown in \Magento\Backend\Model\Auth to keep the behavior consistent.
              * Constant cannot be created in Auth Model since it uses legacy translation that doesn't support it.
@@ -83,11 +90,18 @@ class AdminTokenService implements \Magento\Integration\Api\AdminTokenServiceInt
                 __('You did not sign in correctly or your account is temporarily disabled.')
             );
         }
+        $this->getRequestThrottler()->resetAuthenticationFailuresCount($username, RequestThrottler::USER_TYPE_ADMIN);
         return $this->tokenModelFactory->create()->createAdminToken($this->userModel->getId())->getToken();
     }
 
     /**
-     * {@inheritdoc}
+     * Revoke token by admin id.
+     *
+     * The function will delete the token from the oauth_token table.
+     *
+     * @param int $adminId
+     * @return bool
+     * @throws \Magento\Framework\Exception\LocalizedException
      */
     public function revokeAdminAccessToken($adminId)
     {
@@ -97,11 +111,25 @@ class AdminTokenService implements \Magento\Integration\Api\AdminTokenServiceInt
         }
         try {
             foreach ($tokenCollection as $token) {
-                $token->setRevoked(1)->save();
+                $token->delete();
             }
         } catch (\Exception $e) {
             throw new LocalizedException(__('The tokens could not be revoked.'));
         }
         return true;
+    }
+
+    /**
+     * Get request throttler instance
+     *
+     * @return RequestThrottler
+     * @deprecated 100.0.4
+     */
+    private function getRequestThrottler()
+    {
+        if (!$this->requestThrottler instanceof RequestThrottler) {
+            return \Magento\Framework\App\ObjectManager::getInstance()->get(RequestThrottler::class);
+        }
+        return $this->requestThrottler;
     }
 }

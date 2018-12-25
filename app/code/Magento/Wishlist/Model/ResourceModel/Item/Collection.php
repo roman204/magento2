@@ -1,14 +1,20 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Wishlist\Model\ResourceModel\Item;
+
+use Magento\Catalog\Api\Data\ProductInterface;
+use Magento\Framework\EntityManager\MetadataPool;
 
 /**
  * Wishlist item collection
  * @SuppressWarnings(PHPMD.TooManyFields)
  * @SuppressWarnings(PHPMD.CouplingBetweenObjects)
+ *
+ * @api
+ * @since 100.0.2
  */
 class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\AbstractCollection
 {
@@ -133,6 +139,12 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
     protected $_appState;
 
     /**
+     * @var MetadataPool
+     * @since 100.1.0
+     */
+    protected $metadataPool;
+
+    /**
      * @param \Magento\Framework\Data\Collection\EntityFactory $entityFactory
      * @param \Psr\Log\LoggerInterface $logger
      * @param \Magento\Framework\Data\Collection\Db\FetchStrategyInterface $fetchStrategy
@@ -196,8 +208,23 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
      */
     public function _construct()
     {
-        $this->_init('Magento\Wishlist\Model\Item', 'Magento\Wishlist\Model\ResourceModel\Item');
+        $this->_init(\Magento\Wishlist\Model\Item::class, \Magento\Wishlist\Model\ResourceModel\Item::class);
         $this->addFilterToMap('store_id', 'main_table.store_id');
+    }
+
+    /**
+     * Get metadata pool object
+     *
+     * @return MetadataPool
+     * @since 100.1.0
+     */
+    protected function getMetadataPool()
+    {
+        if ($this->metadataPool == null) {
+            $this->metadataPool = \Magento\Framework\App\ObjectManager::getInstance()
+                ->get(\Magento\Framework\EntityManager\MetadataPool::class);
+        }
+        return $this->metadataPool;
     }
 
     /**
@@ -254,9 +281,7 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
             'WISHLIST:' . __METHOD__,
             ['group' => 'WISHLIST', 'method' => __METHOD__]
         );
-        $productIds = [];
 
-        $this->_productIds = array_merge($this->_productIds, array_keys($productIds));
         /** @var \Magento\Catalog\Model\ResourceModel\Product\Collection $productCollection */
         $productCollection = $this->_productCollectionFactory->create();
 
@@ -267,7 +292,7 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
         $productCollection->addPriceData()
             ->addTaxPercents()
             ->addIdFilter($this->_productIds)
-            ->addAttributeToSelect('*')
+            ->addAttributeToSelect($this->_wishlistConfig->getProductAttributes())
             ->addOptionsToResult()
             ->addUrlRewrite();
 
@@ -282,6 +307,7 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
 
         $checkInStock = $this->_productInStock && !$this->stockConfiguration->isShowOutOfStock();
 
+        /** @var \Magento\Wishlist\Model\Item $item */
         foreach ($this as $item) {
             $product = $productCollection->getItemById($item->getProductId());
             if ($product) {
@@ -295,7 +321,7 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
                     $item->setPrice($product->getPrice());
                 }
             } else {
-                $item->isDeleted(true);
+                $this->removeItemByKey($item->getId());
             }
         }
 
@@ -479,12 +505,14 @@ class Collection extends \Magento\Framework\Model\ResourceModel\Db\Collection\Ab
 
             $storeId = $this->_storeManager->getStore(\Magento\Store\Model\Store::ADMIN_CODE)->getId();
 
+            $entityMetadata = $this->getMetadataPool()->getMetadata(ProductInterface::class);
+
             $this->getSelect()->join(
                 ['product_name_table' => $attribute->getBackendTable()],
-                'product_name_table.entity_id=main_table.product_id' .
-                ' AND product_name_table.store_id=' .
+                'product_name_table.' . $entityMetadata->getLinkField() . ' = main_table.product_id' .
+                ' AND product_name_table.store_id = ' .
                 $storeId .
-                ' AND product_name_table.attribute_id=' .
+                ' AND product_name_table.attribute_id = ' .
                 $attribute->getId(),
                 []
             );

@@ -1,11 +1,13 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Customer\Controller\Adminhtml\Index;
 
 use Magento\Backend\App\Action;
+use Magento\Customer\Model\EmailNotificationInterface;
+use Magento\Customer\Test\Block\Form\Login;
 use Magento\Customer\Ui\Component\Listing\AttributeRepository;
 use Magento\Customer\Api\Data\CustomerInterface;
 use Magento\Customer\Api\CustomerRepositoryInterface;
@@ -22,26 +24,40 @@ class InlineEdit extends \Magento\Backend\App\Action
      */
     const ADMIN_RESOURCE = 'Magento_Customer::manage';
 
-    /** @var CustomerInterface */
+    /**
+     * @var \Magento\Customer\Api\Data\CustomerInterface
+     */
     private $customer;
 
-    /** @var CustomerRepositoryInterface */
+    /**
+     * @var \Magento\Customer\Api\CustomerRepositoryInterface
+     */
     protected $customerRepository;
 
-    /** @var \Magento\Framework\Controller\Result\JsonFactory  */
+    /**
+     * @var \Magento\Framework\Controller\Result\JsonFactory
+     */
     protected $resultJsonFactory;
 
-    /** @var \Magento\Customer\Model\Customer\Mapper  */
+    /**
+     * @var \Magento\Customer\Model\Customer\Mapper
+     */
     protected $customerMapper;
 
-    /** @var \Magento\Framework\Api\DataObjectHelper  */
+    /**
+     * @var \Magento\Framework\Api\DataObjectHelper
+     */
     protected $dataObjectHelper;
 
-    /** @var \Psr\Log\LoggerInterface */
+    /**
+     * @var \Psr\Log\LoggerInterface
+     */
     protected $logger;
 
-    /** @var \Magento\Customer\Helper\EmailNotification */
-    protected $emailNotification;
+    /**
+     * @var \Magento\Customer\Model\EmailNotificationInterface
+     */
+    private $emailNotification;
 
     /**
      * @param Action\Context $context
@@ -68,30 +84,16 @@ class InlineEdit extends \Magento\Backend\App\Action
     }
 
     /**
-     * Set email notification
-     *
-     * @param \Magento\Customer\Helper\EmailNotification $emailNotification
-     * @return void
-     * @deprecated
-     */
-    public function setEmailNotification(\Magento\Customer\Helper\EmailNotification $emailNotification)
-    {
-
-        $this->emailNotification = $emailNotification;
-    }
-
-    /**
      * Get email notification
      *
-     * @return \Magento\Customer\Helper\EmailNotification
-     * @deprecated
+     * @return EmailNotificationInterface
+     * @deprecated 100.1.0
      */
-    public function getEmailNotification()
+    private function getEmailNotification()
     {
-
-        if (!($this->emailNotification instanceof \Magento\Customer\Helper\EmailNotification)) {
+        if (!($this->emailNotification instanceof EmailNotificationInterface)) {
             return \Magento\Framework\App\ObjectManager::getInstance()->get(
-                'Magento\Customer\Helper\EmailNotification'
+                EmailNotificationInterface::class
             );
         } else {
             return $this->emailNotification;
@@ -124,7 +126,7 @@ class InlineEdit extends \Magento\Backend\App\Action
             $this->updateCustomer($this->getData($postItems[$customerId], true));
             $this->saveCustomer($this->getCustomer());
 
-            $this->getEmailNotification()->sendNotificationEmailsIfRequired($currentCustomer, $this->getCustomer());
+            $this->getEmailNotification()->credentialsChanged($this->getCustomer(), $currentCustomer->getEmail());
         }
 
         return $resultJson->setData([
@@ -175,7 +177,7 @@ class InlineEdit extends \Magento\Backend\App\Action
         $this->dataObjectHelper->populateWithArray(
             $customer,
             $customerData,
-            '\Magento\Customer\Api\Data\CustomerInterface'
+            \Magento\Customer\Api\Data\CustomerInterface::class
         );
     }
 
@@ -194,7 +196,7 @@ class InlineEdit extends \Magento\Backend\App\Action
                 $this->dataObjectHelper->populateWithArray(
                     $address,
                     $this->processAddressData($data),
-                    '\Magento\Customer\Api\Data\AddressInterface'
+                    \Magento\Customer\Api\Data\AddressInterface::class
                 );
                 break;
             }

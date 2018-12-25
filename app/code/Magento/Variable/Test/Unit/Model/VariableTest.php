@@ -1,40 +1,53 @@
 <?php
 /***
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Variable\Test\Unit\Model;
 
 use Magento\Framework\TestFramework\Unit\Helper\ObjectManager;
 
-class VariableTest extends \PHPUnit_Framework_TestCase
+/**
+ * Unit test for class Magento\Variable\Model\Variable.
+ */
+class VariableTest extends \PHPUnit\Framework\TestCase
 {
-    /** @var  \Magento\Variable\Model\Variable */
+    /**
+     * @var \Magento\Variable\Model\Variable
+     */
     private $model;
 
-    /** @var  \PHPUnit_Framework_MockObject_MockObject */
+    /**
+     * @var \PHPUnit_Framework_MockObject_MockObject
+     */
     private $escaperMock;
 
-    /** @var  \PHPUnit_Framework_MockObject_MockObject */
+    /**
+     * @var \PHPUnit_Framework_MockObject_MockObject
+     */
     private $resourceMock;
 
-    /** @var  \Magento\Framework\Phrase */
+    /**
+     * @var \Magento\Framework\Phrase
+     */
     private $validationFailedPhrase;
 
-    /** @var  \Magento\Framework\TestFramework\Unit\Helper\ObjectManager */
+    /**
+     * @var \Magento\Framework\TestFramework\Unit\Helper\ObjectManager
+     */
     private $objectManager;
 
-    public function setUp()
+    protected function setUp()
     {
         $this->objectManager = new ObjectManager($this);
-        $this->escaperMock = $this->getMockBuilder('Magento\Framework\Escaper')
+        $this->escaperMock = $this->getMockBuilder(\Magento\Framework\Escaper::class)
             ->disableOriginalConstructor()
             ->getMock();
-        $this->resourceMock = $this->getMockBuilder('Magento\Variable\Model\ResourceModel\Variable')
+        $this->resourceMock = $this->getMockBuilder(\Magento\Variable\Model\ResourceModel\Variable::class)
             ->disableOriginalConstructor()
             ->getMock();
         $this->model = $this->objectManager->getObject(
-            'Magento\Variable\Model\Variable',
+            \Magento\Variable\Model\Variable::class,
             [
                 'escaper' => $this->escaperMock,
                 'resource' => $this->resourceMock
@@ -81,7 +94,6 @@ class VariableTest extends \PHPUnit_Framework_TestCase
     {
         $this->model->setCode($code)->setName($name);
         $this->assertEquals($this->validationFailedPhrase, $this->model->validate());
-
     }
 
     /**
@@ -99,63 +111,9 @@ class VariableTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals($expectedResult, $this->model->validate($variableArray));
     }
 
-    public function testGetVariablesOptionArrayNoGroup()
-    {
-        $origOptions = [
-            ['value' => 'VAL', 'label' => 'LBL',]
-        ];
-
-        $transformedOptions = [
-            ['value' => '{{customVar code=VAL}}', 'label' => __('%1', 'LBL')]
-        ];
-
-        $collectionMock = $this->getMockBuilder('\Magento\Variable\Model\ResourceModel\Variable\Collection')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $collectionMock->expects($this->any())
-            ->method('toOptionArray')
-            ->willReturn($origOptions);
-        $mockVariable = $this->getMock(
-            'Magento\Variable\Model\Variable',
-            ['getCollection'],
-            $this->objectManager->getConstructArguments('Magento\Variable\Model\Variable')
-        );
-        $mockVariable->expects($this->any())
-            ->method('getCollection')
-            ->willReturn($collectionMock);
-        $this->assertEquals($transformedOptions, $mockVariable->getVariablesOptionArray());
-    }
-
-    public function testGetVariablesOptionArrayWithGroup()
-    {
-        $origOptions = [
-            ['value' => 'VAL', 'label' => 'LBL',]
-        ];
-
-        $transformedOptions = [
-            'label' => __('Custom Variables'),
-            'value' => [
-                ['value' => '{{customVar code=VAL}}', 'label' => __('%1', 'LBL')]
-            ]
-        ];
-
-        $collectionMock = $this->getMockBuilder('\Magento\Variable\Model\ResourceModel\Variable\Collection')
-            ->disableOriginalConstructor()
-            ->getMock();
-        $collectionMock->expects($this->any())
-            ->method('toOptionArray')
-            ->willReturn($origOptions);
-        $mockVariable = $this->getMock(
-            'Magento\Variable\Model\Variable',
-            ['getCollection'],
-            $this->objectManager->getConstructArguments('Magento\Variable\Model\Variable')
-        );
-        $mockVariable->expects($this->any())
-            ->method('getCollection')
-            ->willReturn($collectionMock);
-        $this->assertEquals($transformedOptions, $mockVariable->getVariablesOptionArray(true));
-    }
-
+    /**
+     * @return array
+     */
     public function validateDataProvider()
     {
         $variable = [
@@ -168,6 +126,9 @@ class VariableTest extends \PHPUnit_Framework_TestCase
         ];
     }
 
+    /**
+     * @return array
+     */
     public function validateMissingInfoDataProvider()
     {
         return [

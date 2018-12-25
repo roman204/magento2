@@ -1,10 +1,18 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 namespace Magento\Eav\Model\Entity\Attribute\Source;
 
+use Magento\Framework\App\ObjectManager;
+use Magento\Store\Model\StoreManagerInterface;
+use Magento\Framework\Escaper;
+
+/**
+ * @api
+ * @since 100.0.2
+ */
 class Table extends \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
 {
     /**
@@ -25,16 +33,29 @@ class Table extends \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
     protected $_attrOptionFactory;
 
     /**
+     * @var StoreManagerInterface
+     */
+    private $storeManager;
+
+    /**
+     * @var Escaper
+     */
+    private $escaper;
+
+    /**
      * @param \Magento\Eav\Model\ResourceModel\Entity\Attribute\Option\CollectionFactory $attrOptionCollectionFactory
      * @param \Magento\Eav\Model\ResourceModel\Entity\Attribute\OptionFactory $attrOptionFactory
+     * @param Escaper|null $escaper
      * @codeCoverageIgnore
      */
     public function __construct(
         \Magento\Eav\Model\ResourceModel\Entity\Attribute\Option\CollectionFactory $attrOptionCollectionFactory,
-        \Magento\Eav\Model\ResourceModel\Entity\Attribute\OptionFactory $attrOptionFactory
+        \Magento\Eav\Model\ResourceModel\Entity\Attribute\OptionFactory $attrOptionFactory,
+        Escaper $escaper = null
     ) {
         $this->_attrOptionCollectionFactory = $attrOptionCollectionFactory;
         $this->_attrOptionFactory = $attrOptionFactory;
+        $this->escaper = $escaper ?: ObjectManager::getInstance()->get(Escaper::class);
     }
 
     /**
@@ -47,29 +68,49 @@ class Table extends \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
     public function getAllOptions($withEmpty = true, $defaultValues = false)
     {
         $storeId = $this->getAttribute()->getStoreId();
+        if ($storeId === null) {
+            $storeId = $this->getStoreManager()->getStore()->getId();
+        }
         if (!is_array($this->_options)) {
             $this->_options = [];
         }
         if (!is_array($this->_optionsDefault)) {
             $this->_optionsDefault = [];
         }
-        if (!isset($this->_options[$storeId])) {
+        $attributeId = $this->getAttribute()->getId();
+        if (!isset($this->_options[$storeId][$attributeId])) {
             $collection = $this->_attrOptionCollectionFactory->create()->setPositionOrder(
                 'asc'
             )->setAttributeFilter(
-                $this->getAttribute()->getId()
+                $attributeId
             )->setStoreFilter(
-                $this->getAttribute()->getStoreId()
+                $storeId
             )->load();
-            $this->_options[$storeId] = $collection->toOptionArray();
-            $this->_optionsDefault[$storeId] = $collection->toOptionArray('default_value');
+            $this->_options[$storeId][$attributeId] = $collection->toOptionArray();
+            $this->_optionsDefault[$storeId][$attributeId] = $collection->toOptionArray('default_value');
         }
-        $options = $defaultValues ? $this->_optionsDefault[$storeId] : $this->_options[$storeId];
+        $options = $defaultValues
+            ? $this->_optionsDefault[$storeId][$attributeId]
+            : $this->_options[$storeId][$attributeId];
         if ($withEmpty) {
-            array_unshift($options, ['label' => '', 'value' => '']);
+            $options = $this->addEmptyOption($options);
         }
 
         return $options;
+    }
+
+    /**
+     * Get StoreManager dependency
+     *
+     * @return StoreManagerInterface
+     * @deprecated 100.1.6
+     */
+    private function getStoreManager()
+    {
+        if ($this->storeManager === null) {
+            $this->storeManager = ObjectManager::getInstance()->get(StoreManagerInterface::class);
+        }
+        return $this->storeManager;
     }
 
     /**
@@ -89,8 +130,18 @@ class Table extends \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
             ->load()
             ->toOptionArray();
         if ($withEmpty) {
-            array_unshift($options, ['label' => '', 'value' => '']);
+            $options = $this->addEmptyOption($options);
         }
+        return $options;
+    }
+
+    /**
+     * @param array $options
+     * @return array
+     */
+    private function addEmptyOption(array $options)
+    {
+        array_unshift($options, ['label' => $this->getAttribute()->getIsRequired() ? '' : ' ', 'value' => '']);
         return $options;
     }
 
@@ -110,21 +161,24 @@ class Table extends \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
 
         $options = $this->getSpecificOptions($value, false);
 
-        if ($isMultiple) {
-            $values = [];
-            foreach ($options as $item) {
-                if (in_array($item['value'], $value)) {
-                    $values[] = $item['label'];
-                }
+        if (!is_array($value)) {
+            $value = [$value];
+        }
+        $optionsText = [];
+        foreach ($options as $item) {
+            if (in_array($item['value'], $value)) {
+                $optionsText[] = ($this->_attribute->getIsHtmlAllowedOnFront())
+                    ? $item['label']
+                    : $this->escaper->escapeHtml($item['label']);
             }
-            return $values;
         }
 
-        foreach ($options as $item) {
-            if ($item['value'] == $value) {
-                return $item['label'];
-            }
+        if ($isMultiple) {
+            return $optionsText;
+        } elseif ($optionsText) {
+            return $optionsText[0];
         }
+
         return false;
     }
 
@@ -138,18 +192,20 @@ class Table extends \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
      */
     public function addValueSortToCollection($collection, $dir = \Magento\Framework\DB\Select::SQL_ASC)
     {
-        $valueTable1 = $this->getAttribute()->getAttributeCode() . '_t1';
-        $valueTable2 = $this->getAttribute()->getAttributeCode() . '_t2';
+        $attribute = $this->getAttribute();
+        $valueTable1 = $attribute->getAttributeCode() . '_t1';
+        $valueTable2 = $attribute->getAttributeCode() . '_t2';
+        $linkField = $attribute->getEntity()->getLinkField();
         $collection->getSelect()->joinLeft(
-            [$valueTable1 => $this->getAttribute()->getBackend()->getTable()],
-            "e.entity_id={$valueTable1}.entity_id" .
-            " AND {$valueTable1}.attribute_id='{$this->getAttribute()->getId()}'" .
+            [$valueTable1 => $attribute->getBackend()->getTable()],
+            "e.{$linkField}={$valueTable1}." . $linkField .
+            " AND {$valueTable1}.attribute_id='{$attribute->getId()}'" .
             " AND {$valueTable1}.store_id=0",
             []
         )->joinLeft(
-            [$valueTable2 => $this->getAttribute()->getBackend()->getTable()],
-            "e.entity_id={$valueTable2}.entity_id" .
-            " AND {$valueTable2}.attribute_id='{$this->getAttribute()->getId()}'" .
+            [$valueTable2 => $attribute->getBackend()->getTable()],
+            "e.{$linkField}={$valueTable2}." . $linkField .
+            " AND {$valueTable2}.attribute_id='{$attribute->getId()}'" .
             " AND {$valueTable2}.store_id='{$collection->getStoreId()}'",
             []
         );
@@ -161,11 +217,11 @@ class Table extends \Magento\Eav\Model\Entity\Attribute\Source\AbstractSource
 
         $this->_attrOptionFactory->create()->addOptionValueToCollection(
             $collection,
-            $this->getAttribute(),
+            $attribute,
             $valueExpr
         );
 
-        $collection->getSelect()->order("{$this->getAttribute()->getAttributeCode()} {$dir}");
+        $collection->getSelect()->order("{$attribute->getAttributeCode()} {$dir}");
 
         return $this;
     }

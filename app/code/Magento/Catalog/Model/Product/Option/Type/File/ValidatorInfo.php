@@ -1,11 +1,14 @@
 <?php
 /**
- * Copyright © 2015 Magento. All rights reserved.
+ * Copyright © Magento, Inc. All rights reserved.
  * See COPYING.txt for license details.
  */
 
 namespace Magento\Catalog\Model\Product\Option\Type\File;
 
+/**
+ * Validator for existing files.
+ */
 class ValidatorInfo extends Validator
 {
     /**
@@ -90,7 +93,7 @@ class ValidatorInfo extends Validator
         }
 
         $result = false;
-        if ($validatorChain->isValid($this->fileFullPath)) {
+        if ($validatorChain->isValid($this->fileFullPath, $optionValue['title'])) {
             $result = $this->rootDirectory->isReadable($this->fileRelativePath)
                 && isset($optionValue['secret_key'])
                 && $this->buildSecretKey($this->fileRelativePath) == $optionValue['secret_key'];
